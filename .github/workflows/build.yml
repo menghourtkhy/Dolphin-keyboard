@@ -16,8 +16,8 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.khmer.keyboard"
-              android:versionCode="3"
-              android:versionName="3.0">
+              android:versionCode="4"
+              android:versionName="4.0">
               <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="33" />
               <application
                   android:label="Khmer Gesture Keyboard"
@@ -38,6 +38,7 @@ jobs:
                       android:exported="true">
                       <intent-filter>
                           <action android:name="android.view.InputMethod" />
+                          <category android:name="android.intent.category.DEFAULT" />
                       </intent-filter>
                       <meta-data
                           android:name="android.view.im"
@@ -86,6 +87,9 @@ jobs:
                   "#FFFFFF", "#1E293B", "#B91C1C", "#1D4ED8",
                   "#D97706", "#BE185D", "#EA580C", "#15803D"
               };
+              private static final String[] SIZE_NAMES = {
+                  "តូច (Small)", "មធ្យម (Normal)", "ធំ (Large)", "ធំខ្លាំង (XL)"
+              };
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
@@ -100,7 +104,7 @@ jobs:
                   layout.setPadding(40, 48, 40, 48);
 
                   TextView title = new TextView(this);
-                  title.setText("ក្តារចុចខ្មែរ, អង់គ្លេស & Emoji (8 ពណ៌)");
+                  title.setText("ក្តារចុចខ្មែរ, អង់គ្លេស & Emoji (Smart Size)");
                   title.setTextSize(20);
                   title.setTextColor(Color.parseColor("#1E293B"));
                   title.setGravity(Gravity.CENTER);
@@ -108,7 +112,7 @@ jobs:
 
                   LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  lp.setMargins(0, 24, 0, 12);
+                  lp.setMargins(0, 20, 0, 10);
 
                   Button btnEnable = new Button(this);
                   btnEnable.setText("1. Enable Keyboard in Settings (បើកក្តារចុច)");
@@ -123,8 +127,35 @@ jobs:
                   });
                   layout.addView(btnSelect, lp);
 
+                  TextView sizeLabel = new TextView(this);
+                  sizeLabel.setText("3. ទំហំក្តារចុច (Keyboard Height / Size):");
+                  sizeLabel.setTextSize(16);
+                  sizeLabel.setTextColor(Color.parseColor("#334155"));
+                  layout.addView(sizeLabel, lp);
+
+                  GridLayout sizeGrid = new GridLayout(this);
+                  sizeGrid.setColumnCount(2);
+                  for (int i = 0; i < SIZE_NAMES.length; i++) {
+                      final int sIdx = i;
+                      Button sBtn = new Button(this);
+                      sBtn.setText(SIZE_NAMES[i]);
+                      sBtn.setBackgroundColor(Color.parseColor("#E2E8F0"));
+                      sBtn.setTextColor(Color.parseColor("#0F172A"));
+                      GridLayout.LayoutParams slp = new GridLayout.LayoutParams();
+                      slp.width = 0;
+                      slp.height = GridLayout.LayoutParams.WRAP_CONTENT;
+                      slp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+                      slp.setMargins(8, 8, 8, 8);
+                      sBtn.setOnClickListener(v -> {
+                          prefs.edit().putInt("size_index", sIdx).apply();
+                          Toast.makeText(this, "Size: " + SIZE_NAMES[sIdx], Toast.LENGTH_SHORT).show();
+                      });
+                      sizeGrid.addView(sBtn, slp);
+                  }
+                  layout.addView(sizeGrid, lp);
+
                   TextView colorLabel = new TextView(this);
-                  colorLabel.setText("3. ជ្រើសរើសពណ៌ក្តារចុច (Choose Keyboard Color):");
+                  colorLabel.setText("4. ជ្រើសរើសពណ៌ក្តារចុច (Choose Keyboard Color):");
                   colorLabel.setTextSize(16);
                   colorLabel.setTextColor(Color.parseColor("#334155"));
                   layout.addView(colorLabel, lp);
@@ -151,7 +182,7 @@ jobs:
                   layout.addView(grid, lp);
 
                   EditText testBox = new EditText(this);
-                  testBox.setHint("សាកល្បងវាយអក្សរ និងប្តូរពណ៌ទីនេះ...");
+                  testBox.setHint("សាកល្បងវាយអក្សរ និងប្តូរទំហំ/ពណ៌ទីនេះ...");
                   testBox.setMinLines(3);
                   testBox.setGravity(Gravity.TOP | Gravity.START);
                   layout.addView(testBox, lp);
@@ -172,6 +203,7 @@ jobs:
           import android.graphics.Paint;
           import android.graphics.RectF;
           import android.inputmethodservice.InputMethodService;
+          import android.util.DisplayMetrics;
           import android.view.KeyEvent;
           import android.view.MotionEvent;
           import android.view.View;
@@ -192,7 +224,7 @@ jobs:
               public void onWindowShown() {
                   super.onWindowShown();
                   if (kbView != null) {
-                      kbView.reloadThemeFromPrefs();
+                      kbView.reloadSettingsFromPrefs();
                   }
               }
 
@@ -206,12 +238,16 @@ jobs:
                   private int previousLangMode = MODE_KH;
                   private boolean showNumberRow = false;
 
-                  private int emojiCat = 1;
+                  private int emojiCat = 1; // 0..8 = Emojis, 9 = Color & Size Settings (🎨)
                   private float emojiScrollY = 0f;
                   private float maxEmojiScrollY = 0f;
                   private boolean isEmojiScrolling = false;
 
                   private int themeIndex = 0;
+                  private int sizeIndex = 1; // 0=Small, 1=Normal, 2=Large, 3=XL
+                  private final float[] SIZE_SCALES = {0.86f, 1.00f, 1.12f, 1.24f};
+                  private final String[] SIZE_LABELS = {"S (តូច)", "M (មធ្យម)", "L (ធំ)", "XL (ធំខ្លាំង)"};
+
                   private final String[][] THEMES = {
                       {"White (ស)", "#D1D5DB", "#FFFFFF", "#E2E8F0", "#B0B7C3", "#CBD5E1", "#111827", "#4B5563", "#1D4ED8"},
                       {"Dark Mode (ងងឹត)", "#0F172A", "#1E293B", "#334155", "#334155", "#475569", "#F8FAFC", "#94A3B8", "#2563EB"},
@@ -273,6 +309,7 @@ jobs:
                   public GestureKeyboardView(Context context) {
                       super(context);
                       prefs = context.getSharedPreferences("khmer_emoji_prefs", Context.MODE_PRIVATE);
+                      showNumberRow = prefs.getBoolean("show_num_row", false);
 
                       borderPaint.setStyle(Paint.Style.STROKE);
                       borderPaint.setStrokeWidth(2f);
@@ -281,14 +318,24 @@ jobs:
                       popupTextPaint.setColor(Color.WHITE);
                       popupTextPaint.setTextAlign(Paint.Align.CENTER);
 
-                      reloadThemeFromPrefs();
+                      reloadSettingsFromPrefs();
                       initAllEmojis();
                   }
 
-                  public void reloadThemeFromPrefs() {
+                  public void reloadSettingsFromPrefs() {
                       themeIndex = prefs.getInt("theme_index", 0);
                       if (themeIndex < 0 || themeIndex >= THEMES.length) themeIndex = 0;
+                      sizeIndex = prefs.getInt("size_index", 1);
+                      if (sizeIndex < 0 || sizeIndex >= SIZE_SCALES.length) sizeIndex = 1;
                       applyTheme(themeIndex);
+                      requestLayout();
+                  }
+
+                  private void applySize(int idx) {
+                      sizeIndex = idx;
+                      prefs.edit().putInt("size_index", sizeIndex).apply();
+                      requestLayout();
+                      invalidate();
                   }
 
                   private void applyTheme(int idx) {
@@ -418,11 +465,20 @@ jobs:
                       return v * getResources().getDisplayMetrics().density;
                   }
 
+                  // Smart responsive row height calculation based on screen size and user preset
+                  private float getSmartRowHeight() {
+                      DisplayMetrics dm = getResources().getDisplayMetrics();
+                      boolean isLandscape = dm.widthPixels > dm.heightPixels;
+                      float baseRowH = isLandscape ? dp(42) : Math.max(dp(50), Math.min(dp(62), dm.heightPixels * 0.068f));
+                      return baseRowH * SIZE_SCALES[sizeIndex];
+                  }
+
                   @Override
                   protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
                       int w = MeasureSpec.getSize(widthMeasureSpec);
-                      int rows = (showNumberRow && currentMode != MODE_EMOJI) ? 5 : 4;
-                      int h = (int) (rows * dp(60));
+                      // Lock total rows across ALL modes (including Emoji) so height NEVER jumps!
+                      int rows = showNumberRow ? 5 : 4;
+                      int h = Math.round(rows * getSmartRowHeight());
                       setMeasuredDimension(w, h);
                   }
 
@@ -433,17 +489,15 @@ jobs:
                       int h = getHeight();
                       canvas.drawRect(0, 0, w, h, bgPaint);
 
+                      int totalRows = showNumberRow ? 5 : 4;
+                      float rowH = (float) h / totalRows;
+
                       if (currentMode == MODE_EMOJI) {
-                          drawEmojiOrThemeMode(canvas, w, h);
+                          drawEmojiOrThemeMode(canvas, w, h, rowH);
                           return;
                       }
 
-                      int totalRows = showNumberRow ? 5 : 4;
-                      float rowH = (float) h / totalRows;
                       float colW = (float) w / 10f;
-
-                      topTextPaint.setTextSize(dp(20));
-                      botTextPaint.setTextSize(dp(13));
 
                       int rOffset = 0;
                       if (showNumberRow) {
@@ -468,16 +522,16 @@ jobs:
                       drawBottomBar(canvas, w, (totalRows - 1) * rowH, rowH);
 
                       if (isTouching && !twoFingerGesture && downRow >= 0 && downRow < totalRows - 1 && downCol >= 0) {
-                          boolean swipingDown = (curY - startY) > dp(24);
+                          boolean swipingDown = (curY - startY) > rowH * 0.38f;
                           String preview = getKeyChar(downRow, downCol, swipingDown);
                           if (!preview.isEmpty()) {
                               float px = (downCol + 0.5f) * colW;
                               float py = downRow * rowH;
-                              RectF popRect = new RectF(px - dp(28), Math.max(dp(4), py - dp(56)), px + dp(28), py + dp(6));
+                              RectF popRect = new RectF(px - dp(28), Math.max(dp(4), py - rowH * 0.95f), px + dp(28), py + dp(6));
                               popupPaint.setColor(swipingDown ? Color.parseColor(THEMES[themeIndex][8]) : Color.parseColor("#475569"));
                               canvas.drawRoundRect(popRect, dp(8), dp(8), popupPaint);
-                              popupTextPaint.setTextSize(dp(24));
-                              canvas.drawText(preview, popRect.centerX(), popRect.centerY() + dp(8), popupTextPaint);
+                              popupTextPaint.setTextSize(rowH * 0.42f);
+                              canvas.drawText(preview, popRect.centerX(), popRect.centerY() + rowH * 0.14f, popupTextPaint);
                           }
                       }
                   }
@@ -487,13 +541,17 @@ jobs:
                       keyPaint.setColor(Color.parseColor(pressed ? THEMES[themeIndex][3] : THEMES[themeIndex][2]));
                       canvas.drawRoundRect(rect, dp(5), dp(5), keyPaint);
                       canvas.drawRoundRect(rect, dp(5), dp(5), borderPaint);
-                      canvas.drawText(top, x + w / 2f, y + h * 0.46f, topTextPaint);
+
+                      topTextPaint.setTextSize(Math.min(dp(22), h * 0.35f));
+                      botTextPaint.setTextSize(Math.min(dp(14), h * 0.22f));
+
+                      canvas.drawText(top, x + w / 2f, y + h * 0.45f, topTextPaint);
                       canvas.drawText(bot, x + w / 2f, y + h * 0.82f, botTextPaint);
                   }
 
                   private void drawBottomBar(Canvas canvas, int w, float y, float rowH) {
                       float unit = w / 10f;
-                      topTextPaint.setTextSize(dp(18));
+                      float labelSize = Math.min(dp(18), rowH * 0.31f);
 
                       drawSpecialKey(canvas, 0, y, unit, rowH, currentMode == MODE_EMOJI ? "ក/A" : "😊", false);
                       String globeLabel = (currentMode == MODE_EN) ? "🌐 EN" : "🌐 ខ្មែរ";
@@ -505,7 +563,7 @@ jobs:
                       keyPaint.setColor(Color.parseColor(THEMES[themeIndex][2]));
                       canvas.drawRoundRect(spRect, dp(5), dp(5), keyPaint);
                       canvas.drawRoundRect(spRect, dp(5), dp(5), borderPaint);
-                      topTextPaint.setTextSize(dp(18));
+                      topTextPaint.setTextSize(labelSize);
                       canvas.drawText("?", spX + dp(18), y + rowH * 0.62f, topTextPaint);
                       canvas.drawText("។", spX + spW - dp(18), y + rowH * 0.62f, topTextPaint);
 
@@ -513,7 +571,7 @@ jobs:
                       drawSpecialKey(canvas, delX, y, unit * 1.3f, rowH, "⌫", false);
 
                       float entX = unit * 8.7f;
-                      drawSpecialKey(canvas, entX, y, unit * 1.3f, rowH, "↵", false);
+                      drawSpecialKey(canvas, entX, y, unit * 1.3f, rowH, "⏎", false);
                   }
 
                   private void drawSpecialKey(Canvas canvas, float x, float y, float w, float h, String label, boolean highlight) {
@@ -521,13 +579,14 @@ jobs:
                       spKeyPaint.setColor(Color.parseColor(highlight ? THEMES[themeIndex][8] : THEMES[themeIndex][4]));
                       canvas.drawRoundRect(rect, dp(5), dp(5), spKeyPaint);
                       canvas.drawRoundRect(rect, dp(5), dp(5), borderPaint);
-                      topTextPaint.setTextSize(dp(15));
+                      topTextPaint.setTextSize(Math.min(dp(16), h * 0.28f));
                       canvas.drawText(label, x + w / 2f, y + h * 0.62f, topTextPaint);
                   }
 
-                  private void drawEmojiOrThemeMode(Canvas canvas, int w, int h) {
-                      float tabH = dp(40);
-                      float bottomH = dp(56);
+                  private void drawEmojiOrThemeMode(Canvas canvas, int w, int h, float rowH) {
+                      float tabH = rowH * 0.68f;
+                      // Lock bottom bar to the exact same rowH as the main keyboard!
+                      float bottomH = rowH;
                       float gridTop = tabH;
                       float gridBottom = h - bottomH;
                       float gridH = gridBottom - gridTop;
@@ -535,7 +594,7 @@ jobs:
                       float tabW = w / 10f;
                       spKeyPaint.setColor(Color.parseColor(THEMES[themeIndex][4]));
                       canvas.drawRect(0, 0, w, tabH, spKeyPaint);
-                      topTextPaint.setTextSize(dp(18));
+                      topTextPaint.setTextSize(Math.min(dp(18), tabH * 0.48f));
                       for (int i = 0; i < 10; i++) {
                           float tx = i * tabW;
                           if (i == emojiCat) {
@@ -544,25 +603,40 @@ jobs:
                           canvas.drawText(CAT_ICONS[i], tx + tabW / 2f, tabH * 0.68f, topTextPaint);
                       }
 
+                      // Tab 9 (🎨): 4 Size Buttons at Top + 8 Color Theme Cards Below
                       if (emojiCat == 9) {
+                          float sizeBarH = gridH * 0.28f;
+                          float sizeBtnW = w / 4f;
+                          for (int s = 0; s < 4; s++) {
+                              float sx = s * sizeBtnW;
+                              RectF sRect = new RectF(sx + dp(4), gridTop + dp(4), sx + sizeBtnW - dp(4), gridTop + sizeBarH - dp(4));
+                              spKeyPaint.setColor(Color.parseColor(s == sizeIndex ? THEMES[themeIndex][8] : THEMES[themeIndex][4]));
+                              canvas.drawRoundRect(sRect, dp(6), dp(6), spKeyPaint);
+                              popupTextPaint.setColor(s == sizeIndex ? Color.WHITE : Color.parseColor(THEMES[themeIndex][6]));
+                              popupTextPaint.setTextSize(Math.min(dp(13), sizeBarH * 0.34f));
+                              canvas.drawText(SIZE_LABELS[s], sRect.centerX(), sRect.centerY() + dp(4), popupTextPaint);
+                          }
+
+                          float colorAreaTop = gridTop + sizeBarH;
+                          float colorAreaH = gridH - sizeBarH;
                           float cardW = w / 4f;
-                          float cardH = gridH / 2f;
+                          float cardH = colorAreaH / 2f;
                           for (int i = 0; i < 8; i++) {
                               int r = i / 4;
                               int c = i % 4;
                               float cx = c * cardW;
-                              float cy = gridTop + r * cardH;
-                              RectF card = new RectF(cx + dp(5), cy + dp(5), cx + cardW - dp(5), cy + cardH - dp(5));
+                              float cy = colorAreaTop + r * cardH;
+                              RectF card = new RectF(cx + dp(4), cy + dp(4), cx + cardW - dp(4), cy + cardH - dp(4));
                               keyPaint.setColor(Color.parseColor(THEMES[i][2]));
-                              canvas.drawRoundRect(card, dp(8), dp(8), keyPaint);
+                              canvas.drawRoundRect(card, dp(7), dp(7), keyPaint);
 
                               borderPaint.setColor(i == themeIndex ? Color.WHITE : Color.parseColor(THEMES[i][5]));
                               borderPaint.setStrokeWidth(i == themeIndex ? 5f : 2f);
-                              canvas.drawRoundRect(card, dp(8), dp(8), borderPaint);
+                              canvas.drawRoundRect(card, dp(7), dp(7), borderPaint);
                               borderPaint.setStrokeWidth(2f);
 
                               popupTextPaint.setColor(Color.parseColor(THEMES[i][6]));
-                              popupTextPaint.setTextSize(dp(12));
+                              popupTextPaint.setTextSize(Math.min(dp(12), cardH * 0.26f));
                               canvas.drawText(THEMES[i][0], card.centerX(), card.centerY() + dp(4), popupTextPaint);
                           }
                           popupTextPaint.setColor(Color.WHITE);
@@ -571,13 +645,15 @@ jobs:
                           return;
                       }
 
+                      // Smart Auto-Fitting Emoji Grid: Divide gridH into exact whole rows so emojis never get cut in half!
                       List<String> list = emojiLists[emojiCat];
                       int cols = 8;
-                      int totalRows = (int) Math.ceil(list.size() / (float) cols);
+                      int visibleRows = showNumberRow ? 4 : 3;
                       float cellW = (w - dp(8)) / cols;
-                      float cellH = dp(44);
+                      float cellH = gridH / visibleRows;
+                      int totalEmojiRows = (int) Math.ceil(list.size() / (float) cols);
 
-                      maxEmojiScrollY = Math.max(0f, totalRows * cellH - gridH);
+                      maxEmojiScrollY = Math.max(0f, totalEmojiRows * cellH - gridH);
                       if (emojiScrollY > maxEmojiScrollY) emojiScrollY = maxEmojiScrollY;
                       if (emojiScrollY < 0f) emojiScrollY = 0f;
 
@@ -585,9 +661,9 @@ jobs:
                       canvas.clipRect(0, gridTop, w, gridBottom);
                       canvas.drawColor(Color.parseColor(THEMES[themeIndex][1]));
 
-                      topTextPaint.setTextSize(dp(24));
+                      topTextPaint.setTextSize(Math.min(dp(25), cellH * 0.54f));
                       int firstRow = Math.max(0, (int) (emojiScrollY / cellH));
-                      int lastRow = Math.min(totalRows - 1, (int) ((emojiScrollY + gridH) / cellH) + 1);
+                      int lastRow = Math.min(totalEmojiRows - 1, (int) ((emojiScrollY + gridH) / cellH) + 1);
 
                       for (int r = firstRow; r <= lastRow; r++) {
                           float cy = gridTop + r * cellH - emojiScrollY;
@@ -595,12 +671,12 @@ jobs:
                               int idx = r * cols + c;
                               if (idx >= list.size()) break;
                               float cx = c * cellW;
-                              canvas.drawText(list.get(idx), cx + cellW / 2f, cy + cellH * 0.72f, topTextPaint);
+                              canvas.drawText(list.get(idx), cx + cellW / 2f, cy + cellH * 0.68f, topTextPaint);
                           }
                       }
 
                       if (maxEmojiScrollY > 0) {
-                          float thumbH = Math.max(dp(24), gridH * (gridH / (totalRows * cellH)));
+                          float thumbH = Math.max(dp(24), gridH * (gridH / (totalEmojiRows * cellH)));
                           float thumbY = gridTop + (emojiScrollY / maxEmojiScrollY) * (gridH - thumbH);
                           RectF bar = new RectF(w - dp(5), thumbY, w - dp(2), thumbY + thumbH);
                           canvas.drawRoundRect(bar, dp(2), dp(2), accentPaint);
@@ -616,242 +692,4 @@ jobs:
                       if (showNumberRow && row == 0) {
                           return (currentMode == MODE_EN) ? EN_NUMS[col][idx] : KH_NUMS[col][idx];
                       }
-                      int r = row - rOffset;
-                      if (r < 0 || r >= 3 || col < 0 || col >= 10) return "";
-                      String[][][] active = (currentMode == MODE_KH) ? KH_ROWS :
-                                            (currentMode == MODE_EN) ? EN_ROWS : SYM_ROWS;
-                      return active[r][col][idx];
-                  }
-
-                  @Override
-                  public boolean onTouchEvent(MotionEvent event) {
-                      int action = event.getActionMasked();
-                      int w = getWidth();
-                      int h = getHeight();
-                      int totalRows = (showNumberRow && currentMode != MODE_EMOJI) ? 5 : 4;
-                      float rowH = (float) h / totalRows;
-
-                      if (event.getPointerCount() >= 2 && currentMode != MODE_EMOJI) {
-                          float avgY = (event.getY(0) + event.getY(1)) / 2f;
-                          if (!twoFingerGesture) {
-                              twoFingerGesture = true;
-                              twoFingerStartY = avgY;
-                          } else {
-                              float dy = avgY - twoFingerStartY;
-                              if (dy < -dp(25) && !showNumberRow) {
-                                  showNumberRow = true;
-                                  requestLayout();
-                                  invalidate();
-                              } else if (dy > dp(25) && showNumberRow) {
-                                  showNumberRow = false;
-                                  requestLayout();
-                                  invalidate();
-                              }
-                          }
-                          return true;
-                      }
-
-                      switch (action) {
-                          case MotionEvent.ACTION_DOWN:
-                              twoFingerGesture = false;
-                              isEmojiScrolling = false;
-                              isTouching = true;
-                              startX = curX = event.getX();
-                              startY = curY = lastY = event.getY();
-                              downRow = (int) (startY / rowH);
-                              downCol = (int) (startX / (w / 10f));
-                              invalidate();
-                              break;
-
-                          case MotionEvent.ACTION_MOVE:
-                              curX = event.getX();
-                              curY = event.getY();
-                              if (currentMode == MODE_EMOJI && emojiCat < 9 && startY >= dp(40) && startY <= h - dp(56)) {
-                                  if (!isEmojiScrolling && Math.abs(curY - startY) > dp(10) && Math.abs(curY - startY) > Math.abs(curX - startX)) {
-                                      isEmojiScrolling = true;
-                                  }
-                                  if (isEmojiScrolling) {
-                                      emojiScrollY -= (curY - lastY);
-                                      if (emojiScrollY < 0f) emojiScrollY = 0f;
-                                      if (emojiScrollY > maxEmojiScrollY) emojiScrollY = maxEmojiScrollY;
-                                  }
-                              }
-                              lastY = curY;
-                              invalidate();
-                              break;
-
-                          case MotionEvent.ACTION_UP:
-                              isTouching = false;
-                              if (twoFingerGesture) {
-                                  twoFingerGesture = false;
-                                  invalidate();
-                                  return true;
-                              }
-                              handleRelease(event.getX(), event.getY(), w, h, totalRows, rowH);
-                              isEmojiScrolling = false;
-                              downRow = -1;
-                              downCol = -1;
-                              invalidate();
-                              break;
-                      }
-                      return true;
-                  }
-
-                  private void handleRelease(float endX, float endY, int w, int h, int totalRows, float rowH) {
-                      InputConnection ic = getCurrentInputConnection();
-                      if (ic == null) return;
-
-                      float dx = endX - startX;
-                      float dy = endY - startY;
-
-                      if (currentMode == MODE_EMOJI) {
-                          float tabH = dp(40);
-                          float bottomTop = h - dp(56);
-
-                          if (isEmojiScrolling) return;
-
-                          if (startY >= tabH && startY < bottomTop && Math.abs(dx) > dp(55) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
-                              if (dx < 0 && emojiCat < 9) {
-                                  emojiCat++;
-                                  emojiScrollY = 0f;
-                              } else if (dx > 0 && emojiCat > 0) {
-                                  emojiCat--;
-                                  emojiScrollY = 0f;
-                              }
-                              return;
-                          }
-
-                          if (startY < tabH) {
-                              int cat = (int) (startX / (w / 10f));
-                              if (cat >= 0 && cat < 10) {
-                                  emojiCat = cat;
-                                  emojiScrollY = 0f;
-                              }
-                              return;
-                          }
-
-                          if (startY >= tabH && startY < bottomTop) {
-                              if (emojiCat == 9) {
-                                  int c = (int) (startX / (w / 4f));
-                                  int r = (int) ((startY - tabH) / ((bottomTop - tabH) / 2f));
-                                  int chosenTheme = r * 4 + c;
-                                  if (chosenTheme >= 0 && chosenTheme < 8) {
-                                      applyTheme(chosenTheme);
-                                  }
-                                  return;
-                              }
-
-                              int cols = 8;
-                              float cellW = (w - dp(8)) / cols;
-                              float cellH = dp(44);
-                              int c = (int) (startX / cellW);
-                              int r = (int) ((startY - tabH + emojiScrollY) / cellH);
-                              if (c >= 0 && c < cols && r >= 0) {
-                                  int idx = r * cols + c;
-                                  List<String> list = emojiLists[emojiCat];
-                                  if (idx >= 0 && idx < list.size()) {
-                                      String chosen = list.get(idx);
-                                      ic.commitText(chosen, 1);
-                                      recordRecentEmoji(chosen);
-                                  }
-                              }
-                              return;
-                          }
-
-                          handleBottomBar(ic, startX, dy, w);
-                          return;
-                      }
-
-                      if (Math.abs(dx) > dp(65) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
-                          if (dx < 0) {
-                              deleteOneChar(ic);
-                          } else {
-                              if (currentMode == MODE_SYM) {
-                                  currentMode = previousLangMode;
-                              } else {
-                                  previousLangMode = currentMode;
-                                  currentMode = MODE_SYM;
-                              }
-                          }
-                          return;
-                      }
-
-                      if (downRow == totalRows - 1) {
-                          handleBottomBar(ic, startX, dy, w);
-                          return;
-                      }
-
-                      boolean swipeDown = dy > dp(24) && Math.abs(dy) > Math.abs(dx);
-                      String text = getKeyChar(downRow, downCol, swipeDown);
-                      if (!text.isEmpty()) {
-                          ic.commitText(text, 1);
-                      }
-                  }
-
-                  private void handleBottomBar(InputConnection ic, float x, float dy, int w) {
-                      float unit = w / 10f;
-                      if (x < unit) {
-                          if (dy < -dp(22)) {
-                              applyTheme((themeIndex + 1) % THEMES.length);
-                              return;
-                          }
-                          if (currentMode == MODE_EMOJI) {
-                              currentMode = previousLangMode;
-                          } else {
-                              previousLangMode = (currentMode == MODE_SYM) ? MODE_KH : currentMode;
-                              currentMode = MODE_EMOJI;
-                              emojiScrollY = 0f;
-                          }
-                          requestLayout();
-                      } else if (x < unit * 2.3f) {
-                          currentMode = (currentMode == MODE_EN) ? MODE_KH : MODE_EN;
-                          previousLangMode = currentMode;
-                          requestLayout();
-                      } else if (x < unit * 7.4f) {
-                          if (dy < -dp(22)) {
-                              float midSpace = unit * 2.3f + (unit * 5.1f) / 2f;
-                              ic.commitText(x < midSpace ? "?" : "។", 1);
-                          } else {
-                              ic.commitText(" ", 1);
-                          }
-                      } else if (x < unit * 8.7f) {
-                          deleteOneChar(ic);
-                      } else {
-                          sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER);
-                      }
-                  }
-
-                  private void deleteOneChar(InputConnection ic) {
-                      CharSequence selected = ic.getSelectedText(0);
-                      if (selected != null && selected.length() > 0) {
-                          ic.commitText("", 1);
-                      } else {
-                          sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL);
-                      }
-                  }
-              }
-          }
-          EOF
-
-      - name: Compile and Sign APK
-        run: |
-          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
-          PLATFORM=$(ls -d $ANDROID_HOME/platforms/android-* | sort -V | tail -n 1)
-
-          "$BUILD_TOOLS/aapt2" compile --dir res -o res.zip
-          "$BUILD_TOOLS/aapt2" link -o unaligned.apk -I "$PLATFORM/android.jar" --manifest AndroidManifest.xml --java gen res.zip
-
-          javac -encoding UTF-8 -source 8 -target 8 -cp "$PLATFORM/android.jar" -d obj src/com/khmer/keyboard/*.java gen/com/khmer/keyboard/R.java
-          "$BUILD_TOOLS/d8" --lib "$PLATFORM/android.jar" --output . obj/com/khmer/keyboard/*.class
-
-          zip -uj unaligned.apk classes.dex
-          "$BUILD_TOOLS/zipalign" -p -f 4 unaligned.apk aligned.apk
-
-          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          "$BUILD_TOOLS/apksigner" sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android --out KhmerEnglishEmojiKeyboard.apk aligned.apk
-
-      - name: Upload APK for Download
-        uses: actions/upload-artifact@v4
-        with:
-          name: Khmer-English-Emoji-Keyboard-APK
-          path: KhmerEnglishEmojiKeyboard.apk
+                      int r = row - rOffset
