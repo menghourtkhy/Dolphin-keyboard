@@ -16,8 +16,8 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.khmer.keyboard"
-              android:versionCode="5"
-              android:versionName="5.0">
+              android:versionCode="6"
+              android:versionName="6.0">
               <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="33" />
               <application
                   android:label="Khmer NiDA Keyboard"
@@ -104,7 +104,7 @@ jobs:
                   layout.setPadding(40, 48, 40, 48);
 
                   TextView title = new TextView(this);
-                  title.setText("ក្តារចុចខ្មែរ NiDA, អង់គ្លេស & Emoji");
+                  title.setText("ក្តារចុចខ្មែរ NiDA (Smooth Edition)");
                   title.setTextSize(20);
                   title.setTextColor(Color.parseColor("#1E293B"));
                   title.setGravity(Gravity.CENTER);
@@ -225,6 +225,7 @@ jobs:
           cat << 'EOF' > src/com/khmer/keyboard/KhmerIME.java
           package com.khmer.keyboard;
 
+          import android.animation.ValueAnimator;
           import android.content.Context;
           import android.content.SharedPreferences;
           import android.graphics.Canvas;
@@ -239,8 +240,11 @@ jobs:
           import android.view.HapticFeedbackConstants;
           import android.view.KeyEvent;
           import android.view.MotionEvent;
+          import android.view.VelocityTracker;
           import android.view.View;
+          import android.view.animation.DecelerateInterpolator;
           import android.view.inputmethod.InputConnection;
+          import android.widget.OverScroller;
           import java.util.ArrayList;
           import java.util.List;
 
@@ -274,16 +278,32 @@ jobs:
                   private boolean isShifted = false;
 
                   private int emojiCat = 1;
+                  private float animTabPos = 1f;
                   private float emojiScrollY = 0f;
                   private float maxEmojiScrollY = 0f;
                   private boolean isEmojiScrolling = false;
+                  private final OverScroller emojiScroller;
+                  private VelocityTracker velocityTracker;
+
+                  // Smooth Transition States
+                  private float modeTransitionProgress = 1f;
+                  private float modeSlideDirection = 1f;
+                  private float popupScaleProgress = 0f;
+                  private float swipeMorphProgress = 0f;
+                  private int lastReleasedRow = -1, lastReleasedCol = -1;
+                  private float keyReleaseFade = 0f;
+
+                  private ValueAnimator modeAnimator;
+                  private ValueAnimator tabAnimator;
+                  private ValueAnimator popupAnimator;
+                  private ValueAnimator releaseFadeAnimator;
+                  private final DecelerateInterpolator smoothInterp = new DecelerateInterpolator(1.6f);
 
                   private int themeIndex = 0;
                   private int sizeIndex = 1;
                   private final float[] SIZE_SCALES = {0.88f, 1.00f, 1.12f, 1.24f};
                   private final String[] SIZE_LABELS = {"S (តូច)", "M (មធ្យម)", "L (ធំ)", "XL (ធំខ្លាំង)"};
 
-                  // {Name, Bg/Divider, KeyBg, KeyPressed, BottomBarKey, GridLine, TopText, BotText, AccentBlue}
                   private final String[][] THEMES = {
                       {"White (ស)", "#CBD5E1", "#FFFFFF", "#D1D5DB", "#AEB6C2", "#E2E8F0", "#111827", "#64748B", "#1A73E8"},
                       {"Dark Mode (ងងឹត)", "#0F172A", "#1E293B", "#334155", "#0F172A", "#334155", "#F8FAFC", "#94A3B8", "#3B82F6"},
@@ -333,7 +353,6 @@ jobs:
                   private final String[] CAT_ICONS = {"🕒", "😀", "👋", "🐻", "🍔", "🚗", "⚽", "💡", "🇰🇭", "🎨"};
                   private final SharedPreferences prefs;
 
-                  // Exact Khmer NiDA QWERTY Positions (Row 3 starts with ឋ ខ ច វ ប ន ម on Z X C V B N M!)
                   private final String[][][] KH_ROWS = {
                       {{"ឆ","ឈ"},{"ឹ","ឺ"},{"េ","ែ"},{"រ","ឬ"},{"ត","ទ"},{"យ","ួ"},{"ុ","ូ"},{"ិ","ី"},{"ោ","ៅ"},{"ផ","ភ"}},
                       {{"ា","ាំ"},{"ស","ៃ"},{"ដ","ឌ"},{"ថ","ធ"},{"ង","អ"},{"ហ","ះ"},{"្","ញ"},{"ក","គ"},{"ល","ឡ"},{"់","៉"}},
@@ -362,6 +381,7 @@ jobs:
 
                   public GestureKeyboardView(Context context) {
                       super(context);
+                      emojiScroller = new OverScroller(context);
                       prefs = context.getSharedPreferences("khmer_emoji_prefs", Context.MODE_PRIVATE);
                       showNumberRow = prefs.getBoolean("show_num_row", false);
                       useShiftKeyMode = prefs.getBoolean("use_shift_key", false);
@@ -375,6 +395,74 @@ jobs:
 
                       reloadSettingsFromPrefs();
                       initAllEmojis();
+                  }
+
+                  private void triggerModeTransition(int newMode, float direction) {
+                      if (currentMode == newMode) return;
+                      currentMode = newMode;
+                      modeSlideDirection = direction;
+                      if (modeAnimator != null) modeAnimator.cancel();
+                      modeAnimator = ValueAnimator.ofFloat(0f, 1f);
+                      modeAnimator.setDuration(190);
+                      modeAnimator.setInterpolator(smoothInterp);
+                      modeAnimator.addUpdateListener(anim -> {
+                          modeTransitionProgress = (float) anim.getAnimatedValue();
+                          invalidate();
+                      });
+                      modeAnimator.start();
+                  }
+
+                  private void switchEmojiCategory(int newCat) {
+                      if (newCat < 0 || newCat > 9 || newCat == emojiCat) return;
+                      float startTab = animTabPos;
+                      emojiCat = newCat;
+                      emojiScroller.forceFinished(true);
+                      emojiScrollY = 0f;
+                      if (tabAnimator != null) tabAnimator.cancel();
+                      tabAnimator = ValueAnimator.ofFloat(startTab, (float) newCat);
+                      tabAnimator.setDuration(210);
+                      tabAnimator.setInterpolator(smoothInterp);
+                      tabAnimator.addUpdateListener(anim -> {
+                          animTabPos = (float) anim.getAnimatedValue();
+                          invalidate();
+                      });
+                      tabAnimator.start();
+                  }
+
+                  private void triggerPopupAppear() {
+                      if (popupAnimator != null) popupAnimator.cancel();
+                      popupAnimator = ValueAnimator.ofFloat(0.6f, 1f);
+                      popupAnimator.setDuration(110);
+                      popupAnimator.setInterpolator(smoothInterp);
+                      popupAnimator.addUpdateListener(anim -> {
+                          popupScaleProgress = (float) anim.getAnimatedValue();
+                          invalidate();
+                      });
+                      popupAnimator.start();
+                  }
+
+                  private void triggerKeyReleaseFade(int row, int col) {
+                      lastReleasedRow = row;
+                      lastReleasedCol = col;
+                      if (releaseFadeAnimator != null) releaseFadeAnimator.cancel();
+                      releaseFadeAnimator = ValueAnimator.ofFloat(1f, 0f);
+                      releaseFadeAnimator.setDuration(150);
+                      releaseFadeAnimator.setInterpolator(smoothInterp);
+                      releaseFadeAnimator.addUpdateListener(anim -> {
+                          keyReleaseFade = (float) anim.getAnimatedValue();
+                          invalidate();
+                      });
+                      releaseFadeAnimator.start();
+                  }
+
+                  @Override
+                  public void computeScroll() {
+                      if (emojiScroller.computeScrollOffset()) {
+                          emojiScrollY = emojiScroller.getCurrY();
+                          if (emojiScrollY < 0f) emojiScrollY = 0f;
+                          if (emojiScrollY > maxEmojiScrollY) emojiScrollY = maxEmojiScrollY;
+                          postInvalidateOnAnimation();
+                      }
                   }
 
                   public void reloadSettingsFromPrefs() {
@@ -536,6 +624,14 @@ jobs:
                       setMeasuredDimension(w, h);
                   }
 
+                  private int blendColors(int c1, int c2, float ratio) {
+                      float ir = 1f - ratio;
+                      int r = (int) (Color.red(c1) * ir + Color.red(c2) * ratio);
+                      int g = (int) (Color.green(c1) * ir + Color.green(c2) * ratio);
+                      int b = (int) (Color.blue(c1) * ir + Color.blue(c2) * ratio);
+                      return Color.rgb(r, g, b);
+                  }
+
                   @Override
                   protected void onDraw(Canvas canvas) {
                       super.onDraw(canvas);
@@ -546,8 +642,19 @@ jobs:
                       int totalRows = showNumberRow ? 5 : 4;
                       float rowH = (float) h / totalRows;
 
+                      // Apply smooth slide + fade transition when switching modes
+                      boolean animatingMode = modeTransitionProgress < 0.99f;
+                      if (animatingMode) {
+                          int alpha = (int) (80 + 175 * modeTransitionProgress);
+                          float offsetX = (1f - modeTransitionProgress) * dp(18) * modeSlideDirection;
+                          canvas.saveLayerAlpha(0, 0, w, h - rowH, alpha);
+                          canvas.translate(offsetX, 0);
+                      }
+
                       if (currentMode == MODE_EMOJI) {
                           drawEmojiOrThemeMode(canvas, w, h, rowH);
+                          if (animatingMode) canvas.restore();
+                          drawBottomBar(canvas, w, (totalRows - 1) * rowH, rowH);
                           return;
                       }
 
@@ -559,7 +666,8 @@ jobs:
                           for (int c = 0; c < 10; c++) {
                               String top = isShifted ? nums[c][1] : nums[c][0];
                               String bot = isShifted ? nums[c][0] : nums[c][1];
-                              drawFlatNiDAKey(canvas, c * colW, 0, colW, rowH, top, bot, false, c == 7 && currentMode == MODE_KH);
+                              float pressRatio = getKeyPressRatio(0, c);
+                              drawFlatNiDAKey(canvas, c * colW, 0, colW, rowH, top, bot, pressRatio, false);
                           }
                           rOffset = 1;
                       }
@@ -570,32 +678,45 @@ jobs:
                       for (int r = 0; r < 3; r++) {
                           float y = (r + rOffset) * rowH;
                           for (int c = 0; c < 10; c++) {
-                              boolean pressed = isTouching && (downRow == r + rOffset) && (downCol == c);
+                              float pressRatio = getKeyPressRatio(r + rOffset, c);
                               String top = isShifted ? activeRows[r][c][1] : activeRows[r][c][0];
                               String bot = isShifted ? activeRows[r][c][0] : activeRows[r][c][1];
                               boolean hasCommaHint = (currentMode == MODE_KH && r == 2 && c == 7);
-                              drawFlatNiDAKey(canvas, c * colW, y, colW, rowH, top, bot, pressed, hasCommaHint);
+                              drawFlatNiDAKey(canvas, c * colW, y, colW, rowH, top, bot, pressRatio, hasCommaHint);
                           }
+                      }
+
+                      if (animatingMode) {
+                          canvas.restore();
                       }
 
                       drawBottomBar(canvas, w, (totalRows - 1) * rowH, rowH);
 
-                      // Authentic Popups matching Screenshots 7 & 8!
+                      // Smooth Morphing Key Popup (Tap = Gray Key-Cover, Swipe Down = Blue House)
                       if (isTouching && !twoFingerGesture && downRow >= 0 && downRow < totalRows - 1 && downCol >= 0) {
-                          boolean swipingDown = (curY - startY) > rowH * 0.35f;
+                          float targetMorph = (curY - startY) > rowH * 0.35f ? 1f : 0f;
+                          swipeMorphProgress += (targetMorph - swipeMorphProgress) * 0.45f;
+                          if (Math.abs(targetMorph - swipeMorphProgress) > 0.02f) {
+                              postInvalidateOnAnimation();
+                          } else {
+                              swipeMorphProgress = targetMorph;
+                          }
+
                           String topChar = getKeyChar(downRow, downCol, false);
                           String botChar = getKeyChar(downRow, downCol, true);
                           float cx = (downCol + 0.5f) * colW;
                           float keyTopY = downRow * rowH;
 
-                          if (swipingDown) {
-                              // Blue House-Shaped Pentagon Popup (Exact match to Screenshot 7)
+                          canvas.save();
+                          canvas.scale(popupScaleProgress, popupScaleProgress, cx, keyTopY + rowH * 0.5f);
+
+                          if (swipeMorphProgress > 0.3f) {
                               float pw = Math.max(colW * 1.35f, dp(48));
-                              float ph = rowH * 1.25f;
+                              float ph = rowH * (1.15f + 0.12f * swipeMorphProgress);
                               float left = Math.max(dp(4), Math.min(w - pw - dp(4), cx - pw / 2f));
                               float right = left + pw;
                               float top = Math.max(dp(4), keyTopY - ph * 0.45f);
-                              float roofY = top + ph * 0.32f;
+                              float roofY = top + ph * (0.32f * swipeMorphProgress);
                               float bottom = top + ph;
 
                               popupPath.reset();
@@ -608,14 +729,15 @@ jobs:
                               popupPath.lineTo(left, roofY);
                               popupPath.close();
 
-                              popupPaint.setColor(Color.parseColor(THEMES[themeIndex][8]));
+                              int cNormal = Color.parseColor(THEMES[themeIndex][3]);
+                              int cAccent = Color.parseColor(THEMES[themeIndex][8]);
+                              popupPaint.setColor(blendColors(cNormal, cAccent, swipeMorphProgress));
                               canvas.drawPath(popupPath, popupPaint);
 
                               popupTextPaint.setColor(Color.WHITE);
                               popupTextPaint.setTextSize(rowH * 0.42f);
                               canvas.drawText(botChar, left + pw / 2f, bottom - ph * 0.26f, popupTextPaint);
                           } else {
-                              // Tall Rectangular Key-Cover Popup (Exact match to Screenshot 8)
                               float pw = colW * 1.16f;
                               float left = Math.max(dp(2), Math.min(w - pw - dp(2), cx - pw / 2f));
                               float top = Math.max(dp(2), keyTopY - rowH * 0.35f);
@@ -623,8 +745,8 @@ jobs:
                               RectF rect = new RectF(left, top, left + pw, bottom);
 
                               popupPaint.setColor(Color.parseColor(THEMES[themeIndex][3]));
-                              canvas.drawRoundRect(rect, dp(3), dp(3), popupPaint);
-                              canvas.drawRoundRect(rect, dp(3), dp(3), borderPaint);
+                              canvas.drawRoundRect(rect, dp(4), dp(4), popupPaint);
+                              canvas.drawRoundRect(rect, dp(4), dp(4), borderPaint);
 
                               popupTextPaint.setColor(Color.parseColor(THEMES[themeIndex][6]));
                               popupTextPaint.setTextSize(rowH * 0.42f);
@@ -633,13 +755,21 @@ jobs:
                               botTextPaint.setTextSize(rowH * 0.22f);
                               canvas.drawText(botChar, rect.centerX(), top + (bottom - top) * 0.82f, botTextPaint);
                           }
+                          canvas.restore();
                       }
                   }
 
-                  // Edge-to-Edge Flat Grid Key (Matches Screenshots 1-8 UI)
-                  private void drawFlatNiDAKey(Canvas canvas, float x, float y, float w, float h, String top, String bot, boolean pressed, boolean commaHint) {
+                  private float getKeyPressRatio(int r, int c) {
+                      if (isTouching && downRow == r && downCol == c) return 1f;
+                      if (lastReleasedRow == r && lastReleasedCol == c && keyReleaseFade > 0f) return keyReleaseFade;
+                      return 0f;
+                  }
+
+                  private void drawFlatNiDAKey(Canvas canvas, float x, float y, float w, float h, String top, String bot, float pressRatio, boolean commaHint) {
                       RectF rect = new RectF(x, y, x + w, y + h);
-                      keyPaint.setColor(Color.parseColor(pressed ? THEMES[themeIndex][3] : THEMES[themeIndex][2]));
+                      int normalColor = Color.parseColor(THEMES[themeIndex][2]);
+                      int pressedColor = Color.parseColor(THEMES[themeIndex][3]);
+                      keyPaint.setColor(pressRatio > 0f ? blendColors(normalColor, pressedColor, pressRatio) : normalColor);
                       canvas.drawRect(rect, keyPaint);
                       canvas.drawRect(rect, borderPaint);
 
@@ -659,15 +789,12 @@ jobs:
                       float unit = w / 10f;
                       float labelSize = Math.min(dp(18), rowH * 0.32f);
 
-                      // 1. Left Button: 😊 or ⇧ Shift (if Classic Shift Mode is enabled) or ក/A
                       String leftLabel = (currentMode == MODE_EMOJI) ? "ក/A" : (useShiftKeyMode ? (isShifted ? "⬆️" : "⇧") : "😊");
                       drawFlatSpecialKey(canvas, 0, y, unit * 1.15f, rowH, leftLabel, useShiftKeyMode && isShifted);
 
-                      // 2. Globe / Emoji Switcher
                       String secLabel = useShiftKeyMode ? (currentMode == MODE_EMOJI ? "🌐" : "😊") : "🌐";
                       drawFlatSpecialKey(canvas, unit * 1.15f, y, unit * 1.15f, rowH, secLabel, false);
 
-                      // 3. Clean Wide Spacebar with ? on left and ។ on right (Matches Screenshot 1)
                       float spX = unit * 2.3f;
                       float spW = unit * 5.1f;
                       RectF spRect = new RectF(spX, y, spX + spW, y + rowH);
@@ -683,11 +810,9 @@ jobs:
                       }
                       canvas.drawText("។", spX + spW - dp(16), y + rowH * 0.62f, topTextPaint);
 
-                      // 4. Delete Key (⌫)
                       float delX = unit * 7.4f;
                       drawFlatSpecialKey(canvas, delX, y, unit * 1.3f, rowH, "⌫", isHoldingBackspace);
 
-                      // 5. Enter Key (↵)
                       float entX = unit * 8.7f;
                       drawFlatSpecialKey(canvas, entX, y, unit * 1.3f, rowH, "↵", false);
                   }
@@ -706,430 +831,4 @@ jobs:
                       float bottomH = rowH;
                       float gridTop = tabH;
                       float gridBottom = h - bottomH;
-                      float gridH = gridBottom - gridTop;
-
-                      float tabW = w / 10f;
-                      spKeyPaint.setColor(Color.parseColor(THEMES[themeIndex][4]));
-                      canvas.drawRect(0, 0, w, tabH, spKeyPaint);
-                      topTextPaint.setTextSize(Math.min(dp(18), tabH * 0.48f));
-                      for (int i = 0; i < 10; i++) {
-                          float tx = i * tabW;
-                          if (i == emojiCat) {
-                              canvas.drawRect(tx + dp(4), tabH - dp(3), tx + tabW - dp(4), tabH, accentPaint);
-                          }
-                          canvas.drawText(CAT_ICONS[i], tx + tabW / 2f, tabH * 0.68f, topTextPaint);
-                      }
-
-                      // Tab 9 (🎨): Mode Toggle + 4 Size Buttons + 8 Color Theme Cards
-                      if (emojiCat == 9) {
-                          float topControlsH = gridH * 0.30f;
-                          float sizeBtnW = w / 5f;
-                          for (int s = 0; s < 4; s++) {
-                              float sx = s * sizeBtnW;
-                              RectF sRect = new RectF(sx + dp(3), gridTop + dp(3), sx + sizeBtnW - dp(3), gridTop + topControlsH - dp(3));
-                              spKeyPaint.setColor(Color.parseColor(s == sizeIndex ? THEMES[themeIndex][8] : THEMES[themeIndex][4]));
-                              canvas.drawRoundRect(sRect, dp(5), dp(5), spKeyPaint);
-                              popupTextPaint.setColor(s == sizeIndex ? Color.WHITE : Color.parseColor(THEMES[themeIndex][6]));
-                              popupTextPaint.setTextSize(Math.min(dp(11), topControlsH * 0.32f));
-                              canvas.drawText(SIZE_LABELS[s], sRect.centerX(), sRect.centerY() + dp(4), popupTextPaint);
-                          }
-                          // 5th Button: Toggle Gesture vs Shift Button Mode
-                          RectF mRect = new RectF(4 * sizeBtnW + dp(3), gridTop + dp(3), w - dp(3), gridTop + topControlsH - dp(3));
-                          spKeyPaint.setColor(Color.parseColor(useShiftKeyMode ? THEMES[themeIndex][8] : THEMES[themeIndex][4]));
-                          canvas.drawRoundRect(mRect, dp(5), dp(5), spKeyPaint);
-                          popupTextPaint.setColor(Color.WHITE);
-                          popupTextPaint.setTextSize(Math.min(dp(11), topControlsH * 0.32f));
-                          canvas.drawText(useShiftKeyMode ? "Mode: ⇧" : "Mode: អូស", mRect.centerX(), mRect.centerY() + dp(4), popupTextPaint);
-
-                          float colorAreaTop = gridTop + topControlsH;
-                          float colorAreaH = gridH - topControlsH;
-                          float cardW = w / 4f;
-                          float cardH = colorAreaH / 2f;
-                          for (int i = 0; i < 8; i++) {
-                              int r = i / 4;
-                              int c = i % 4;
-                              float cx = c * cardW;
-                              float cy = colorAreaTop + r * cardH;
-                              RectF card = new RectF(cx + dp(4), cy + dp(4), cx + cardW - dp(4), cy + cardH - dp(4));
-                              keyPaint.setColor(Color.parseColor(THEMES[i][2]));
-                              canvas.drawRoundRect(card, dp(6), dp(6), keyPaint);
-
-                              borderPaint.setColor(i == themeIndex ? Color.WHITE : Color.parseColor(THEMES[i][5]));
-                              borderPaint.setStrokeWidth(i == themeIndex ? 4f : 1.5f);
-                              canvas.drawRoundRect(card, dp(6), dp(6), borderPaint);
-                              borderPaint.setStrokeWidth(1.5f);
-
-                              popupTextPaint.setColor(Color.parseColor(THEMES[i][6]));
-                              popupTextPaint.setTextSize(Math.min(dp(12), cardH * 0.26f));
-                              canvas.drawText(THEMES[i][0], card.centerX(), card.centerY() + dp(4), popupTextPaint);
-                          }
-                          popupTextPaint.setColor(Color.WHITE);
-                          borderPaint.setColor(Color.parseColor(THEMES[themeIndex][5]));
-                          drawBottomBar(canvas, w, gridBottom, bottomH);
-                          return;
-                      }
-
-                      List<String> list = emojiLists[emojiCat];
-                      int cols = 8;
-                      int visibleRows = showNumberRow ? 4 : 3;
-                      float cellW = (w - dp(8)) / cols;
-                      float cellH = gridH / visibleRows;
-                      int totalEmojiRows = (int) Math.ceil(list.size() / (float) cols);
-
-                      maxEmojiScrollY = Math.max(0f, totalEmojiRows * cellH - gridH);
-                      if (emojiScrollY > maxEmojiScrollY) emojiScrollY = maxEmojiScrollY;
-                      if (emojiScrollY < 0f) emojiScrollY = 0f;
-
-                      canvas.save();
-                      canvas.clipRect(0, gridTop, w, gridBottom);
-                      canvas.drawColor(Color.parseColor(THEMES[themeIndex][2]));
-
-                      topTextPaint.setTextSize(Math.min(dp(25), cellH * 0.54f));
-                      int firstRow = Math.max(0, (int) (emojiScrollY / cellH));
-                      int lastRow = Math.min(totalEmojiRows - 1, (int) ((emojiScrollY + gridH) / cellH) + 1);
-
-                      for (int r = firstRow; r <= lastRow; r++) {
-                          float cy = gridTop + r * cellH - emojiScrollY;
-                          for (int c = 0; c < cols; c++) {
-                              int idx = r * cols + c;
-                              if (idx >= list.size()) break;
-                              float cx = c * cellW;
-                              canvas.drawText(list.get(idx), cx + cellW / 2f, cy + cellH * 0.68f, topTextPaint);
-                          }
-                      }
-
-                      if (maxEmojiScrollY > 0) {
-                          float thumbH = Math.max(dp(24), gridH * (gridH / (totalEmojiRows * cellH)));
-                          float thumbY = gridTop + (emojiScrollY / maxEmojiScrollY) * (gridH - thumbH);
-                          RectF bar = new RectF(w - dp(5), thumbY, w - dp(2), thumbY + thumbH);
-                          canvas.drawRoundRect(bar, dp(2), dp(2), accentPaint);
-                      }
-                      canvas.restore();
-
-                      drawBottomBar(canvas, w, gridBottom, bottomH);
-                  }
-
-                  private String getKeyChar(int row, int col, boolean swipeSecondary) {
-                      boolean selectBottom = isShifted ? !swipeSecondary : swipeSecondary;
-                      int idx = selectBottom ? 1 : 0;
-                      int rOffset = showNumberRow ? 1 : 0;
-                      if (showNumberRow && row == 0) {
-                          return (currentMode == MODE_EN) ? EN_NUMS[col][idx] : KH_NUMS[col][idx];
-                      }
-                      int r = row - rOffset;
-                      if (r < 0 || r >= 3 || col < 0 || col >= 10) return "";
-                      String[][][] active = (currentMode == MODE_KH) ? KH_ROWS :
-                                            (currentMode == MODE_EN) ? EN_ROWS : SYM_ROWS;
-                      return active[r][col][idx];
-                  }
-
-                  private void stopBackspaceRepeat() {
-                      isHoldingBackspace = false;
-                      handler.removeCallbacks(backspaceRepeater);
-                  }
-
-                  @Override
-                  public boolean onTouchEvent(MotionEvent event) {
-                      int action = event.getActionMasked();
-                      int w = getWidth();
-                      int h = getHeight();
-                      int totalRows = showNumberRow ? 5 : 4;
-                      float rowH = (float) h / totalRows;
-
-                      // Two-finger vertical swipe for Number Row
-                      if (event.getPointerCount() >= 2 && currentMode != MODE_EMOJI) {
-                          stopBackspaceRepeat();
-                          float dy0 = event.getY(0) - startY;
-                          float avgY = (event.getY(0) + event.getY(1)) / 2f;
-                          if (!twoFingerGesture) {
-                              // If user is typing fast with 2 thumbs on different keys, commit first key!
-                              if (action == MotionEvent.ACTION_POINTER_DOWN && Math.abs(dy0) < dp(15) && downRow >= 0 && downRow < totalRows - 1) {
-                                  InputConnection ic = getCurrentInputConnection();
-                                  if (ic != null) {
-                                      String text = getKeyChar(downRow, downCol, false);
-                                      if (!text.isEmpty()) ic.commitText(text, 1);
-                                      if (isShifted) isShifted = false;
-                                  }
-                                  int pIdx = event.getActionIndex();
-                                  startX = curX = event.getX(pIdx);
-                                  startY = curY = event.getY(pIdx);
-                                  downRow = (int) (startY / rowH);
-                                  downCol = (int) (startX / (w / 10f));
-                                  invalidate();
-                                  return true;
-                              }
-                              twoFingerGesture = true;
-                              twoFingerStartY = avgY;
-                          } else {
-                              float dy = avgY - twoFingerStartY;
-                              if (dy < -dp(25) && !showNumberRow) {
-                                  showNumberRow = true;
-                                  prefs.edit().putBoolean("show_num_row", true).apply();
-                                  requestLayout();
-                                  invalidate();
-                              } else if (dy > dp(25) && showNumberRow) {
-                                  showNumberRow = false;
-                                  prefs.edit().putBoolean("show_num_row", false).apply();
-                                  requestLayout();
-                                  invalidate();
-                              }
-                          }
-                          return true;
-                      }
-
-                      switch (action) {
-                          case MotionEvent.ACTION_DOWN:
-                              twoFingerGesture = false;
-                              isEmojiScrolling = false;
-                              isTouching = true;
-                              startX = curX = event.getX();
-                              startY = curY = lastY = event.getY();
-                              downRow = (int) (startY / rowH);
-                              downCol = (int) (startX / (w / 10f));
-                              performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-
-                              // Start continuous Hold-to-Delete if pressing ⌫
-                              float unit = w / 10f;
-                              if (downRow == totalRows - 1 && startX >= unit * 7.4f && startX < unit * 8.7f) {
-                                  isHoldingBackspace = true;
-                                  handler.postDelayed(backspaceRepeater, 400);
-                              }
-                              invalidate();
-                              break;
-
-                          case MotionEvent.ACTION_MOVE:
-                              curX = event.getX();
-                              curY = event.getY();
-                              if (isHoldingBackspace && (Math.abs(curX - startX) > dp(25) || Math.abs(curY - startY) > dp(25))) {
-                                  stopBackspaceRepeat();
-                              }
-                              float tabH = rowH * 0.68f;
-                              if (currentMode == MODE_EMOJI && emojiCat < 9 && startY >= tabH && startY <= h - rowH) {
-                                  if (!isEmojiScrolling && Math.abs(curY - startY) > dp(10) && Math.abs(curY - startY) > Math.abs(curX - startX)) {
-                                      isEmojiScrolling = true;
-                                  }
-                                  if (isEmojiScrolling) {
-                                      emojiScrollY -= (curY - lastY);
-                                      if (emojiScrollY < 0f) emojiScrollY = 0f;
-                                      if (emojiScrollY > maxEmojiScrollY) emojiScrollY = maxEmojiScrollY;
-                                  }
-                              }
-                              lastY = curY;
-                              invalidate();
-                              break;
-
-                          case MotionEvent.ACTION_UP:
-                          case MotionEvent.ACTION_CANCEL:
-                              boolean wasHoldingBksp = isHoldingBackspace;
-                              stopBackspaceRepeat();
-                              isTouching = false;
-                              if (twoFingerGesture) {
-                                  twoFingerGesture = false;
-                                  invalidate();
-                                  return true;
-                              }
-                              handleRelease(event.getX(), event.getY(), w, h, totalRows, rowH, wasHoldingBksp);
-                              isEmojiScrolling = false;
-                              downRow = -1;
-                              downCol = -1;
-                              invalidate();
-                              break;
-                      }
-                      return true;
-                  }
-
-                  private void handleRelease(float endX, float endY, int w, int h, int totalRows, float rowH, boolean wasHoldingBksp) {
-                      InputConnection ic = getCurrentInputConnection();
-                      if (ic == null) return;
-
-                      float dx = endX - startX;
-                      float dy = endY - startY;
-
-                      if (currentMode == MODE_EMOJI) {
-                          float tabH = rowH * 0.68f;
-                          float bottomTop = h - rowH;
-                          float gridH = bottomTop - tabH;
-
-                          if (isEmojiScrolling) return;
-
-                          if (startY >= tabH && startY < bottomTop && Math.abs(dx) > dp(55) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
-                              if (dx < 0 && emojiCat < 9) {
-                                  emojiCat++;
-                                  emojiScrollY = 0f;
-                              } else if (dx > 0 && emojiCat > 0) {
-                                  emojiCat--;
-                                  emojiScrollY = 0f;
-                              }
-                              return;
-                          }
-
-                          if (startY < tabH) {
-                              int cat = (int) (startX / (w / 10f));
-                              if (cat >= 0 && cat < 10) {
-                                  emojiCat = cat;
-                                  emojiScrollY = 0f;
-                              }
-                              return;
-                          }
-
-                          if (startY >= tabH && startY < bottomTop) {
-                              if (emojiCat == 9) {
-                                  float topControlsH = gridH * 0.30f;
-                                  if (startY < tabH + topControlsH) {
-                                      int btn = (int) (startX / (w / 5f));
-                                      if (btn >= 0 && btn < 4) {
-                                          applySize(btn);
-                                      } else if (btn == 4) {
-                                          useShiftKeyMode = !useShiftKeyMode;
-                                          isShifted = false;
-                                          prefs.edit().putBoolean("use_shift_key", useShiftKeyMode).apply();
-                                      }
-                                      return;
-                                  }
-                                  float colorAreaTop = tabH + topControlsH;
-                                  float colorAreaH = gridH - topControlsH;
-                                  int c = (int) (startX / (w / 4f));
-                                  int r = (int) ((startY - colorAreaTop) / (colorAreaH / 2f));
-                                  int chosenTheme = r * 4 + c;
-                                  if (chosenTheme >= 0 && chosenTheme < 8) {
-                                      applyTheme(chosenTheme);
-                                  }
-                                  return;
-                              }
-
-                              int cols = 8;
-                              int visibleRows = showNumberRow ? 4 : 3;
-                              float cellW = (w - dp(8)) / cols;
-                              float cellH = gridH / visibleRows;
-                              int c = (int) (startX / cellW);
-                              int r = (int) ((startY - tabH + emojiScrollY) / cellH);
-                              if (c >= 0 && c < cols && r >= 0) {
-                                  int idx = r * cols + c;
-                                  List<String> list = emojiLists[emojiCat];
-                                  if (idx >= 0 && idx < list.size()) {
-                                      String chosen = list.get(idx);
-                                      ic.commitText(chosen, 1);
-                                      recordRecentEmoji(chosen);
-                                  }
-                              }
-                              return;
-                          }
-
-                          handleBottomBar(ic, startX, dy, w, rowH, wasHoldingBksp);
-                          return;
-                      }
-
-                      // Global horizontal swipes (Swipe Left = Delete, Swipe Right = Symbols)
-                      if (Math.abs(dx) > dp(65) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
-                          if (dx < 0) {
-                              deleteOneChar(ic);
-                          } else {
-                              if (currentMode == MODE_SYM) {
-                                  currentMode = previousLangMode;
-                              } else {
-                                  previousLangMode = currentMode;
-                                  currentMode = MODE_SYM;
-                              }
-                          }
-                          return;
-                      }
-
-                      if (downRow == totalRows - 1) {
-                          handleBottomBar(ic, startX, dy, w, rowH, wasHoldingBksp);
-                          return;
-                      }
-
-                      boolean swipeDown = dy > rowH * 0.35f && Math.abs(dy) > Math.abs(dx);
-                      String text = getKeyChar(downRow, downCol, swipeDown);
-                      if (!text.isEmpty()) {
-                          ic.commitText(text, 1);
-                          if (isShifted && !swipeDown) {
-                              isShifted = false;
-                          }
-                      }
-                  }
-
-                  private void handleBottomBar(InputConnection ic, float x, float dy, int w, float rowH, boolean wasHoldingBksp) {
-                      float unit = w / 10f;
-                      if (x < unit * 1.15f) {
-                          if (dy < -rowH * 0.36f) {
-                              applyTheme((themeIndex + 1) % THEMES.length);
-                              return;
-                          }
-                          if (currentMode == MODE_EMOJI) {
-                              currentMode = previousLangMode;
-                          } else if (useShiftKeyMode) {
-                              isShifted = !isShifted;
-                          } else {
-                              previousLangMode = (currentMode == MODE_SYM) ? MODE_KH : currentMode;
-                              currentMode = MODE_EMOJI;
-                              emojiScrollY = 0f;
-                          }
-                          invalidate();
-                      } else if (x < unit * 2.3f) {
-                          if (useShiftKeyMode && currentMode != MODE_EMOJI) {
-                              previousLangMode = (currentMode == MODE_SYM) ? MODE_KH : currentMode;
-                              currentMode = MODE_EMOJI;
-                              emojiScrollY = 0f;
-                          } else {
-                              currentMode = (currentMode == MODE_EN) ? MODE_KH : MODE_EN;
-                              previousLangMode = currentMode;
-                              isShifted = false;
-                          }
-                          invalidate();
-                      } else if (x < unit * 7.4f) {
-                          if (dy < -rowH * 0.36f) {
-                              float midSpace = unit * 2.3f + (unit * 5.1f) / 2f;
-                              if (useShiftKeyMode && Math.abs(x - midSpace) < unit * 1.2f) {
-                                  currentMode = (currentMode == MODE_EN) ? MODE_KH : MODE_EN;
-                                  previousLangMode = currentMode;
-                                  isShifted = false;
-                              } else {
-                                  ic.commitText(x < midSpace ? "?" : "។", 1);
-                              }
-                          } else {
-                              ic.commitText(" ", 1);
-                          }
-                      } else if (x < unit * 8.7f) {
-                          if (wasHoldingBksp) {
-                              deleteOneChar(ic);
-                          }
-                      } else {
-                          sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER);
-                      }
-                  }
-
-                  private void deleteOneChar(InputConnection ic) {
-                      CharSequence selected = ic.getSelectedText(0);
-                      if (selected != null && selected.length() > 0) {
-                          ic.commitText("", 1);
-                      } else {
-                          sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL);
-                      }
-                  }
-              }
-          }
-          EOF
-
-      - name: Compile and Sign APK
-        run: |
-          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
-          PLATFORM=$(ls -d $ANDROID_HOME/platforms/android-* | sort -V | tail -n 1)
-
-          "$BUILD_TOOLS/aapt2" compile --dir res -o res.zip
-          "$BUILD_TOOLS/aapt2" link -o unaligned.apk -I "$PLATFORM/android.jar" --manifest AndroidManifest.xml --java gen res.zip
-
-          javac -encoding UTF-8 -source 8 -target 8 -cp "$PLATFORM/android.jar" -d obj src/com/khmer/keyboard/*.java gen/com/khmer/keyboard/R.java
-          "$BUILD_TOOLS/d8" --lib "$PLATFORM/android.jar" --output . obj/com/khmer/keyboard/*.class
-
-          zip -uj unaligned.apk classes.dex
-          "$BUILD_TOOLS/zipalign" -p -f 4 unaligned.apk aligned.apk
-
-          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          "$BUILD_TOOLS/apksigner" sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android --out KhmerEnglishEmojiKeyboard.apk aligned.apk
-
-      - name: Upload APK for Download
-        uses: actions/upload-artifact@v4
-        with:
-          name: Khmer-English-Emoji-Keyboard-APK
-          path: KhmerEnglishEmojiKeyboard.apk
+                      float gridH = gridBottom -
