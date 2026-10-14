@@ -16,16 +16,16 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.khmer.keyboard"
-              android:versionCode="4"
-              android:versionName="4.0">
+              android:versionCode="5"
+              android:versionName="5.0">
               <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="33" />
               <application
-                  android:label="Khmer Gesture Keyboard"
+                  android:label="Khmer NiDA Keyboard"
                   android:icon="@android:drawable/ic_dialog_dialer">
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
-                      android:label="Khmer Keyboard Setup">
+                      android:label="Khmer NiDA Keyboard">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
@@ -33,7 +33,7 @@ jobs:
                   </activity>
                   <service
                       android:name=".KhmerIME"
-                      android:label="Khmer Gesture Keyboard"
+                      android:label="Khmer NiDA Keyboard"
                       android:permission="android.permission.BIND_INPUT_METHOD"
                       android:exported="true">
                       <intent-filter>
@@ -52,7 +52,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <input-method xmlns:android="http://schemas.android.com/apk/res/android">
               <subtype
-                  android:label="Khmer / English / Emoji"
+                  android:label="Khmer NiDA / English"
                   android:imeSubtypeLocale="km_KH"
                   android:imeSubtypeMode="keyboard" />
           </input-method>
@@ -104,7 +104,7 @@ jobs:
                   layout.setPadding(40, 48, 40, 48);
 
                   TextView title = new TextView(this);
-                  title.setText("ក្តារចុចខ្មែរ, អង់គ្លេស & Emoji (Smart Size)");
+                  title.setText("ក្តារចុចខ្មែរ NiDA, អង់គ្លេស & Emoji");
                   title.setTextSize(20);
                   title.setTextColor(Color.parseColor("#1E293B"));
                   title.setGravity(Gravity.CENTER);
@@ -112,7 +112,7 @@ jobs:
 
                   LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                       LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                  lp.setMargins(0, 20, 0, 10);
+                  lp.setMargins(0, 18, 0, 8);
 
                   Button btnEnable = new Button(this);
                   btnEnable.setText("1. Enable Keyboard in Settings (បើកក្តារចុច)");
@@ -120,16 +120,45 @@ jobs:
                   layout.addView(btnEnable, lp);
 
                   Button btnSelect = new Button(this);
-                  btnSelect.setText("2. Select Khmer Gesture Keyboard (ជ្រើសរើសក្តារចុច)");
+                  btnSelect.setText("2. Select Khmer NiDA Keyboard (ជ្រើសរើសក្តារចុច)");
                   btnSelect.setOnClickListener(v -> {
                       InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
                       if (imm != null) imm.showInputMethodPicker();
                   });
                   layout.addView(btnSelect, lp);
 
+                  TextView styleLabel = new TextView(this);
+                  styleLabel.setText("3. របៀបប្រើ NiDA (Keyboard UX Mode):");
+                  styleLabel.setTextSize(15);
+                  styleLabel.setTextColor(Color.parseColor("#334155"));
+                  layout.addView(styleLabel, lp);
+
+                  GridLayout modeGrid = new GridLayout(this);
+                  modeGrid.setColumnCount(2);
+                  String[] modes = {"Gesture (អូសចុះក្រោម)", "Classic NiDA (ប៊ូតុង ⇧ Shift)"};
+                  for (int m = 0; m < 2; m++) {
+                      final boolean useShift = (m == 1);
+                      final String mName = modes[m];
+                      Button mBtn = new Button(this);
+                      mBtn.setText(mName);
+                      mBtn.setBackgroundColor(Color.parseColor("#DBEAFE"));
+                      mBtn.setTextColor(Color.parseColor("#1E3A8A"));
+                      GridLayout.LayoutParams mlp = new GridLayout.LayoutParams();
+                      mlp.width = 0;
+                      mlp.height = GridLayout.LayoutParams.WRAP_CONTENT;
+                      mlp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+                      mlp.setMargins(6, 6, 6, 6);
+                      mBtn.setOnClickListener(v -> {
+                          prefs.edit().putBoolean("use_shift_key", useShift).apply();
+                          Toast.makeText(this, "Mode: " + mName, Toast.LENGTH_SHORT).show();
+                      });
+                      modeGrid.addView(mBtn, mlp);
+                  }
+                  layout.addView(modeGrid, lp);
+
                   TextView sizeLabel = new TextView(this);
-                  sizeLabel.setText("3. ទំហំក្តារចុច (Keyboard Height / Size):");
-                  sizeLabel.setTextSize(16);
+                  sizeLabel.setText("4. ទំហំក្តារចុច (Keyboard Size):");
+                  sizeLabel.setTextSize(15);
                   sizeLabel.setTextColor(Color.parseColor("#334155"));
                   layout.addView(sizeLabel, lp);
 
@@ -145,7 +174,7 @@ jobs:
                       slp.width = 0;
                       slp.height = GridLayout.LayoutParams.WRAP_CONTENT;
                       slp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
-                      slp.setMargins(8, 8, 8, 8);
+                      slp.setMargins(6, 6, 6, 6);
                       sBtn.setOnClickListener(v -> {
                           prefs.edit().putInt("size_index", sIdx).apply();
                           Toast.makeText(this, "Size: " + SIZE_NAMES[sIdx], Toast.LENGTH_SHORT).show();
@@ -155,8 +184,8 @@ jobs:
                   layout.addView(sizeGrid, lp);
 
                   TextView colorLabel = new TextView(this);
-                  colorLabel.setText("4. ជ្រើសរើសពណ៌ក្តារចុច (Choose Keyboard Color):");
-                  colorLabel.setTextSize(16);
+                  colorLabel.setText("5. ពណ៌ក្តារចុច (Choose Color Theme):");
+                  colorLabel.setTextSize(15);
                   colorLabel.setTextColor(Color.parseColor("#334155"));
                   layout.addView(colorLabel, lp);
 
@@ -172,7 +201,7 @@ jobs:
                       glp.width = 0;
                       glp.height = GridLayout.LayoutParams.WRAP_CONTENT;
                       glp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
-                      glp.setMargins(8, 8, 8, 8);
+                      glp.setMargins(6, 6, 6, 6);
                       cBtn.setOnClickListener(v -> {
                           prefs.edit().putInt("theme_index", index).apply();
                           Toast.makeText(this, "Selected: " + THEME_NAMES[index], Toast.LENGTH_SHORT).show();
@@ -182,7 +211,7 @@ jobs:
                   layout.addView(grid, lp);
 
                   EditText testBox = new EditText(this);
-                  testBox.setHint("សាកល្បងវាយអក្សរ និងប្តូរទំហំ/ពណ៌ទីនេះ...");
+                  testBox.setHint("សាកល្បងវាយអក្សរ NiDA ទីនេះ...");
                   testBox.setMinLines(3);
                   testBox.setGravity(Gravity.TOP | Gravity.START);
                   layout.addView(testBox, lp);
@@ -201,9 +230,13 @@ jobs:
           import android.graphics.Canvas;
           import android.graphics.Color;
           import android.graphics.Paint;
+          import android.graphics.Path;
           import android.graphics.RectF;
           import android.inputmethodservice.InputMethodService;
+          import android.os.Handler;
+          import android.os.Looper;
           import android.util.DisplayMetrics;
+          import android.view.HapticFeedbackConstants;
           import android.view.KeyEvent;
           import android.view.MotionEvent;
           import android.view.View;
@@ -237,26 +270,29 @@ jobs:
                   private int currentMode = MODE_KH;
                   private int previousLangMode = MODE_KH;
                   private boolean showNumberRow = false;
+                  private boolean useShiftKeyMode = false;
+                  private boolean isShifted = false;
 
-                  private int emojiCat = 1; // 0..8 = Emojis, 9 = Color & Size Settings (🎨)
+                  private int emojiCat = 1;
                   private float emojiScrollY = 0f;
                   private float maxEmojiScrollY = 0f;
                   private boolean isEmojiScrolling = false;
 
                   private int themeIndex = 0;
-                  private int sizeIndex = 1; // 0=Small, 1=Normal, 2=Large, 3=XL
-                  private final float[] SIZE_SCALES = {0.86f, 1.00f, 1.12f, 1.24f};
+                  private int sizeIndex = 1;
+                  private final float[] SIZE_SCALES = {0.88f, 1.00f, 1.12f, 1.24f};
                   private final String[] SIZE_LABELS = {"S (តូច)", "M (មធ្យម)", "L (ធំ)", "XL (ធំខ្លាំង)"};
 
+                  // {Name, Bg/Divider, KeyBg, KeyPressed, BottomBarKey, GridLine, TopText, BotText, AccentBlue}
                   private final String[][] THEMES = {
-                      {"White (ស)", "#D1D5DB", "#FFFFFF", "#E2E8F0", "#B0B7C3", "#CBD5E1", "#111827", "#4B5563", "#1D4ED8"},
-                      {"Dark Mode (ងងឹត)", "#0F172A", "#1E293B", "#334155", "#334155", "#475569", "#F8FAFC", "#94A3B8", "#2563EB"},
-                      {"Red (ក្រហម)", "#7F1D1D", "#B91C1C", "#991B1B", "#991B1B", "#DC2626", "#FFFFFF", "#FECACA", "#EF4444"},
-                      {"Blue (ខៀវ)", "#1E3A8A", "#1D4ED8", "#1E40AF", "#1E40AF", "#3B82F6", "#FFFFFF", "#BFDBFE", "#0284C7"},
-                      {"Gold (មាស)", "#78350F", "#D97706", "#B45309", "#92400E", "#F59E0B", "#FFFFFF", "#FEF08A", "#CA8A04"},
-                      {"Cherry (ឆឺរី)", "#831843", "#BE185D", "#9D174D", "#9D174D", "#EC4899", "#FFFFFF", "#FBCFE8", "#E11D48"},
-                      {"Orange (ទឹកក្រូច)", "#7C2D12", "#EA580C", "#C2410C", "#9A3412", "#F97316", "#FFFFFF", "#FED7AA", "#D97706"},
-                      {"Green (បៃតង)", "#14532D", "#15803D", "#166534", "#166534", "#22C55E", "#FFFFFF", "#BBF7D0", "#059669"}
+                      {"White (ស)", "#CBD5E1", "#FFFFFF", "#D1D5DB", "#AEB6C2", "#E2E8F0", "#111827", "#64748B", "#1A73E8"},
+                      {"Dark Mode (ងងឹត)", "#0F172A", "#1E293B", "#334155", "#0F172A", "#334155", "#F8FAFC", "#94A3B8", "#3B82F6"},
+                      {"Red (ក្រហម)", "#7F1D1D", "#B91C1C", "#991B1B", "#7F1D1D", "#DC2626", "#FFFFFF", "#FECACA", "#EF4444"},
+                      {"Blue (ខៀវ)", "#1E3A8A", "#1D4ED8", "#1E40AF", "#1E3A8A", "#3B82F6", "#FFFFFF", "#BFDBFE", "#0284C7"},
+                      {"Gold (មាស)", "#78350F", "#D97706", "#B45309", "#78350F", "#F59E0B", "#FFFFFF", "#FEF08A", "#CA8A04"},
+                      {"Cherry (ឆឺរី)", "#831843", "#BE185D", "#9D174D", "#831843", "#EC4899", "#FFFFFF", "#FBCFE8", "#E11D48"},
+                      {"Orange (ទឹកក្រូច)", "#7C2D12", "#EA580C", "#C2410C", "#7C2D12", "#F97316", "#FFFFFF", "#FED7AA", "#D97706"},
+                      {"Green (បៃតង)", "#14532D", "#15803D", "#166534", "#14532D", "#22C55E", "#FFFFFF", "#BBF7D0", "#059669"}
                   };
 
                   private float startX, startY, curX, curY, lastY;
@@ -264,6 +300,22 @@ jobs:
                   private boolean twoFingerGesture = false;
                   private float twoFingerStartY = 0;
                   private int downRow = -1, downCol = -1;
+                  private boolean isHoldingBackspace = false;
+
+                  private final Handler handler = new Handler(Looper.getMainLooper());
+                  private final Runnable backspaceRepeater = new Runnable() {
+                      @Override
+                      public void run() {
+                          if (isHoldingBackspace) {
+                              InputConnection ic = getCurrentInputConnection();
+                              if (ic != null) {
+                                  deleteOneChar(ic);
+                                  performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                              }
+                              handler.postDelayed(this, 65);
+                          }
+                      }
+                  };
 
                   private final Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
                   private final Paint keyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -274,16 +326,18 @@ jobs:
                   private final Paint popupPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
                   private final Paint popupTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
                   private final Paint accentPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  private final Path popupPath = new Path();
 
                   @SuppressWarnings("unchecked")
                   private final List<String>[] emojiLists = new ArrayList[9];
                   private final String[] CAT_ICONS = {"🕒", "😀", "👋", "🐻", "🍔", "🚗", "⚽", "💡", "🇰🇭", "🎨"};
                   private final SharedPreferences prefs;
 
+                  // Exact Khmer NiDA QWERTY Positions (Row 3 starts with ឋ ខ ច វ ប ន ម on Z X C V B N M!)
                   private final String[][][] KH_ROWS = {
                       {{"ឆ","ឈ"},{"ឹ","ឺ"},{"េ","ែ"},{"រ","ឬ"},{"ត","ទ"},{"យ","ួ"},{"ុ","ូ"},{"ិ","ី"},{"ោ","ៅ"},{"ផ","ភ"}},
                       {{"ា","ាំ"},{"ស","ៃ"},{"ដ","ឌ"},{"ថ","ធ"},{"ង","អ"},{"ហ","ះ"},{"្","ញ"},{"ក","គ"},{"ល","ឡ"},{"់","៉"}},
-                      {{"ើ","ោះ"},{"ឋ","ឍ"},{"ខ","ឃ"},{"ច","ជ"},{"វ","េះ"},{"ប","ព"},{"ន","ណ"},{"ម","ំ"},{"៊","ុះ"},{"ៀ","ឿ"}}
+                      {{"ឋ","ឍ"},{"ខ","ឃ"},{"ច","ជ"},{"វ","េះ"},{"ប","ព"},{"ន","ណ"},{"ម","ំ"},{"៊","ុះ"},{"ៀ","ឿ"},{"ើ","ោះ"}}
                   };
 
                   private final String[][] KH_NUMS = {
@@ -310,9 +364,10 @@ jobs:
                       super(context);
                       prefs = context.getSharedPreferences("khmer_emoji_prefs", Context.MODE_PRIVATE);
                       showNumberRow = prefs.getBoolean("show_num_row", false);
+                      useShiftKeyMode = prefs.getBoolean("use_shift_key", false);
 
                       borderPaint.setStyle(Paint.Style.STROKE);
-                      borderPaint.setStrokeWidth(2f);
+                      borderPaint.setStrokeWidth(1.5f);
                       topTextPaint.setTextAlign(Paint.Align.CENTER);
                       botTextPaint.setTextAlign(Paint.Align.CENTER);
                       popupTextPaint.setColor(Color.WHITE);
@@ -327,6 +382,7 @@ jobs:
                       if (themeIndex < 0 || themeIndex >= THEMES.length) themeIndex = 0;
                       sizeIndex = prefs.getInt("size_index", 1);
                       if (sizeIndex < 0 || sizeIndex >= SIZE_SCALES.length) sizeIndex = 1;
+                      useShiftKeyMode = prefs.getBoolean("use_shift_key", false);
                       applyTheme(themeIndex);
                       requestLayout();
                   }
@@ -465,18 +521,16 @@ jobs:
                       return v * getResources().getDisplayMetrics().density;
                   }
 
-                  // Smart responsive row height calculation based on screen size and user preset
                   private float getSmartRowHeight() {
                       DisplayMetrics dm = getResources().getDisplayMetrics();
                       boolean isLandscape = dm.widthPixels > dm.heightPixels;
-                      float baseRowH = isLandscape ? dp(42) : Math.max(dp(50), Math.min(dp(62), dm.heightPixels * 0.068f));
+                      float baseRowH = isLandscape ? dp(42) : Math.max(dp(52), Math.min(dp(62), dm.heightPixels * 0.068f));
                       return baseRowH * SIZE_SCALES[sizeIndex];
                   }
 
                   @Override
                   protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
                       int w = MeasureSpec.getSize(widthMeasureSpec);
-                      // Lock total rows across ALL modes (including Emoji) so height NEVER jumps!
                       int rows = showNumberRow ? 5 : 4;
                       int h = Math.round(rows * getSmartRowHeight());
                       setMeasuredDimension(w, h);
@@ -503,7 +557,9 @@ jobs:
                       if (showNumberRow) {
                           String[][] nums = (currentMode == MODE_EN) ? EN_NUMS : KH_NUMS;
                           for (int c = 0; c < 10; c++) {
-                              drawDualKey(canvas, c * colW, 0, colW, rowH, nums[c][0], nums[c][1], false);
+                              String top = isShifted ? nums[c][1] : nums[c][0];
+                              String bot = isShifted ? nums[c][0] : nums[c][1];
+                              drawFlatNiDAKey(canvas, c * colW, 0, colW, rowH, top, bot, false, c == 7 && currentMode == MODE_KH);
                           }
                           rOffset = 1;
                       }
@@ -515,77 +571,138 @@ jobs:
                           float y = (r + rOffset) * rowH;
                           for (int c = 0; c < 10; c++) {
                               boolean pressed = isTouching && (downRow == r + rOffset) && (downCol == c);
-                              drawDualKey(canvas, c * colW, y, colW, rowH, activeRows[r][c][0], activeRows[r][c][1], pressed);
+                              String top = isShifted ? activeRows[r][c][1] : activeRows[r][c][0];
+                              String bot = isShifted ? activeRows[r][c][0] : activeRows[r][c][1];
+                              boolean hasCommaHint = (currentMode == MODE_KH && r == 2 && c == 7);
+                              drawFlatNiDAKey(canvas, c * colW, y, colW, rowH, top, bot, pressed, hasCommaHint);
                           }
                       }
 
                       drawBottomBar(canvas, w, (totalRows - 1) * rowH, rowH);
 
+                      // Authentic Popups matching Screenshots 7 & 8!
                       if (isTouching && !twoFingerGesture && downRow >= 0 && downRow < totalRows - 1 && downCol >= 0) {
-                          boolean swipingDown = (curY - startY) > rowH * 0.38f;
-                          String preview = getKeyChar(downRow, downCol, swipingDown);
-                          if (!preview.isEmpty()) {
-                              float px = (downCol + 0.5f) * colW;
-                              float py = downRow * rowH;
-                              RectF popRect = new RectF(px - dp(28), Math.max(dp(4), py - rowH * 0.95f), px + dp(28), py + dp(6));
-                              popupPaint.setColor(swipingDown ? Color.parseColor(THEMES[themeIndex][8]) : Color.parseColor("#475569"));
-                              canvas.drawRoundRect(popRect, dp(8), dp(8), popupPaint);
+                          boolean swipingDown = (curY - startY) > rowH * 0.35f;
+                          String topChar = getKeyChar(downRow, downCol, false);
+                          String botChar = getKeyChar(downRow, downCol, true);
+                          float cx = (downCol + 0.5f) * colW;
+                          float keyTopY = downRow * rowH;
+
+                          if (swipingDown) {
+                              // Blue House-Shaped Pentagon Popup (Exact match to Screenshot 7)
+                              float pw = Math.max(colW * 1.35f, dp(48));
+                              float ph = rowH * 1.25f;
+                              float left = Math.max(dp(4), Math.min(w - pw - dp(4), cx - pw / 2f));
+                              float right = left + pw;
+                              float top = Math.max(dp(4), keyTopY - ph * 0.45f);
+                              float roofY = top + ph * 0.32f;
+                              float bottom = top + ph;
+
+                              popupPath.reset();
+                              popupPath.moveTo(left + pw / 2f, top);
+                              popupPath.lineTo(right, roofY);
+                              popupPath.lineTo(right, bottom - dp(6));
+                              popupPath.quadTo(right, bottom, right - dp(6), bottom);
+                              popupPath.lineTo(left + dp(6), bottom);
+                              popupPath.quadTo(left, bottom, left, bottom - dp(6));
+                              popupPath.lineTo(left, roofY);
+                              popupPath.close();
+
+                              popupPaint.setColor(Color.parseColor(THEMES[themeIndex][8]));
+                              canvas.drawPath(popupPath, popupPaint);
+
+                              popupTextPaint.setColor(Color.WHITE);
                               popupTextPaint.setTextSize(rowH * 0.42f);
-                              canvas.drawText(preview, popRect.centerX(), popRect.centerY() + rowH * 0.14f, popupTextPaint);
+                              canvas.drawText(botChar, left + pw / 2f, bottom - ph * 0.26f, popupTextPaint);
+                          } else {
+                              // Tall Rectangular Key-Cover Popup (Exact match to Screenshot 8)
+                              float pw = colW * 1.16f;
+                              float left = Math.max(dp(2), Math.min(w - pw - dp(2), cx - pw / 2f));
+                              float top = Math.max(dp(2), keyTopY - rowH * 0.35f);
+                              float bottom = keyTopY + rowH;
+                              RectF rect = new RectF(left, top, left + pw, bottom);
+
+                              popupPaint.setColor(Color.parseColor(THEMES[themeIndex][3]));
+                              canvas.drawRoundRect(rect, dp(3), dp(3), popupPaint);
+                              canvas.drawRoundRect(rect, dp(3), dp(3), borderPaint);
+
+                              popupTextPaint.setColor(Color.parseColor(THEMES[themeIndex][6]));
+                              popupTextPaint.setTextSize(rowH * 0.42f);
+                              canvas.drawText(topChar, rect.centerX(), top + (bottom - top) * 0.48f, popupTextPaint);
+
+                              botTextPaint.setTextSize(rowH * 0.22f);
+                              canvas.drawText(botChar, rect.centerX(), top + (bottom - top) * 0.82f, botTextPaint);
                           }
                       }
                   }
 
-                  private void drawDualKey(Canvas canvas, float x, float y, float w, float h, String top, String bot, boolean pressed) {
-                      RectF rect = new RectF(x + 1.5f, y + 1.5f, x + w - 1.5f, y + h - 1.5f);
+                  // Edge-to-Edge Flat Grid Key (Matches Screenshots 1-8 UI)
+                  private void drawFlatNiDAKey(Canvas canvas, float x, float y, float w, float h, String top, String bot, boolean pressed, boolean commaHint) {
+                      RectF rect = new RectF(x, y, x + w, y + h);
                       keyPaint.setColor(Color.parseColor(pressed ? THEMES[themeIndex][3] : THEMES[themeIndex][2]));
-                      canvas.drawRoundRect(rect, dp(5), dp(5), keyPaint);
-                      canvas.drawRoundRect(rect, dp(5), dp(5), borderPaint);
+                      canvas.drawRect(rect, keyPaint);
+                      canvas.drawRect(rect, borderPaint);
 
-                      topTextPaint.setTextSize(Math.min(dp(22), h * 0.35f));
-                      botTextPaint.setTextSize(Math.min(dp(14), h * 0.22f));
+                      topTextPaint.setTextSize(Math.min(dp(21), h * 0.36f));
+                      botTextPaint.setTextSize(Math.min(dp(12), h * 0.20f));
 
-                      canvas.drawText(top, x + w / 2f, y + h * 0.45f, topTextPaint);
+                      canvas.drawText(top, x + w / 2f, y + h * 0.44f, topTextPaint);
                       canvas.drawText(bot, x + w / 2f, y + h * 0.82f, botTextPaint);
+
+                      if (commaHint) {
+                          botTextPaint.setTextSize(Math.min(dp(11), h * 0.18f));
+                          canvas.drawText(",", x + w * 0.24f, y + h * 0.62f, botTextPaint);
+                      }
                   }
 
                   private void drawBottomBar(Canvas canvas, int w, float y, float rowH) {
                       float unit = w / 10f;
-                      float labelSize = Math.min(dp(18), rowH * 0.31f);
+                      float labelSize = Math.min(dp(18), rowH * 0.32f);
 
-                      drawSpecialKey(canvas, 0, y, unit, rowH, currentMode == MODE_EMOJI ? "ក/A" : "😊", false);
-                      String globeLabel = (currentMode == MODE_EN) ? "🌐 EN" : "🌐 ខ្មែរ";
-                      drawSpecialKey(canvas, unit, y, unit * 1.3f, rowH, globeLabel, false);
+                      // 1. Left Button: 😊 or ⇧ Shift (if Classic Shift Mode is enabled) or ក/A
+                      String leftLabel = (currentMode == MODE_EMOJI) ? "ក/A" : (useShiftKeyMode ? (isShifted ? "⬆️" : "⇧") : "😊");
+                      drawFlatSpecialKey(canvas, 0, y, unit * 1.15f, rowH, leftLabel, useShiftKeyMode && isShifted);
 
+                      // 2. Globe / Emoji Switcher
+                      String secLabel = useShiftKeyMode ? (currentMode == MODE_EMOJI ? "🌐" : "😊") : "🌐";
+                      drawFlatSpecialKey(canvas, unit * 1.15f, y, unit * 1.15f, rowH, secLabel, false);
+
+                      // 3. Clean Wide Spacebar with ? on left and ។ on right (Matches Screenshot 1)
                       float spX = unit * 2.3f;
                       float spW = unit * 5.1f;
-                      RectF spRect = new RectF(spX + 1.5f, y + 1.5f, spX + spW - 1.5f, y + rowH - 1.5f);
+                      RectF spRect = new RectF(spX, y, spX + spW, y + rowH);
                       keyPaint.setColor(Color.parseColor(THEMES[themeIndex][2]));
-                      canvas.drawRoundRect(spRect, dp(5), dp(5), keyPaint);
-                      canvas.drawRoundRect(spRect, dp(5), dp(5), borderPaint);
+                      canvas.drawRect(spRect, keyPaint);
+                      canvas.drawRect(spRect, borderPaint);
+
                       topTextPaint.setTextSize(labelSize);
-                      canvas.drawText("?", spX + dp(18), y + rowH * 0.62f, topTextPaint);
-                      canvas.drawText("។", spX + spW - dp(18), y + rowH * 0.62f, topTextPaint);
+                      canvas.drawText("?", spX + dp(16), y + rowH * 0.62f, topTextPaint);
+                      if (useShiftKeyMode) {
+                          botTextPaint.setTextSize(dp(11));
+                          canvas.drawText(currentMode == MODE_EN ? "EN (🌐)" : "ខ្មែរ (🌐)", spX + spW / 2f, y + rowH * 0.60f, botTextPaint);
+                      }
+                      canvas.drawText("។", spX + spW - dp(16), y + rowH * 0.62f, topTextPaint);
 
+                      // 4. Delete Key (⌫)
                       float delX = unit * 7.4f;
-                      drawSpecialKey(canvas, delX, y, unit * 1.3f, rowH, "⌫", false);
+                      drawFlatSpecialKey(canvas, delX, y, unit * 1.3f, rowH, "⌫", isHoldingBackspace);
 
+                      // 5. Enter Key (↵)
                       float entX = unit * 8.7f;
-                      drawSpecialKey(canvas, entX, y, unit * 1.3f, rowH, "⏎", false);
+                      drawFlatSpecialKey(canvas, entX, y, unit * 1.3f, rowH, "↵", false);
                   }
 
-                  private void drawSpecialKey(Canvas canvas, float x, float y, float w, float h, String label, boolean highlight) {
-                      RectF rect = new RectF(x + 1.5f, y + 1.5f, x + w - 1.5f, y + h - 1.5f);
+                  private void drawFlatSpecialKey(Canvas canvas, float x, float y, float w, float h, String label, boolean highlight) {
+                      RectF rect = new RectF(x, y, x + w, y + h);
                       spKeyPaint.setColor(Color.parseColor(highlight ? THEMES[themeIndex][8] : THEMES[themeIndex][4]));
-                      canvas.drawRoundRect(rect, dp(5), dp(5), spKeyPaint);
-                      canvas.drawRoundRect(rect, dp(5), dp(5), borderPaint);
-                      topTextPaint.setTextSize(Math.min(dp(16), h * 0.28f));
+                      canvas.drawRect(rect, spKeyPaint);
+                      canvas.drawRect(rect, borderPaint);
+                      topTextPaint.setTextSize(Math.min(dp(17), h * 0.30f));
                       canvas.drawText(label, x + w / 2f, y + h * 0.62f, topTextPaint);
                   }
 
                   private void drawEmojiOrThemeMode(Canvas canvas, int w, int h, float rowH) {
                       float tabH = rowH * 0.68f;
-                      // Lock bottom bar to the exact same rowH as the main keyboard!
                       float bottomH = rowH;
                       float gridTop = tabH;
                       float gridBottom = h - bottomH;
@@ -603,22 +720,29 @@ jobs:
                           canvas.drawText(CAT_ICONS[i], tx + tabW / 2f, tabH * 0.68f, topTextPaint);
                       }
 
-                      // Tab 9 (🎨): 4 Size Buttons at Top + 8 Color Theme Cards Below
+                      // Tab 9 (🎨): Mode Toggle + 4 Size Buttons + 8 Color Theme Cards
                       if (emojiCat == 9) {
-                          float sizeBarH = gridH * 0.28f;
-                          float sizeBtnW = w / 4f;
+                          float topControlsH = gridH * 0.30f;
+                          float sizeBtnW = w / 5f;
                           for (int s = 0; s < 4; s++) {
                               float sx = s * sizeBtnW;
-                              RectF sRect = new RectF(sx + dp(4), gridTop + dp(4), sx + sizeBtnW - dp(4), gridTop + sizeBarH - dp(4));
+                              RectF sRect = new RectF(sx + dp(3), gridTop + dp(3), sx + sizeBtnW - dp(3), gridTop + topControlsH - dp(3));
                               spKeyPaint.setColor(Color.parseColor(s == sizeIndex ? THEMES[themeIndex][8] : THEMES[themeIndex][4]));
-                              canvas.drawRoundRect(sRect, dp(6), dp(6), spKeyPaint);
+                              canvas.drawRoundRect(sRect, dp(5), dp(5), spKeyPaint);
                               popupTextPaint.setColor(s == sizeIndex ? Color.WHITE : Color.parseColor(THEMES[themeIndex][6]));
-                              popupTextPaint.setTextSize(Math.min(dp(13), sizeBarH * 0.34f));
+                              popupTextPaint.setTextSize(Math.min(dp(11), topControlsH * 0.32f));
                               canvas.drawText(SIZE_LABELS[s], sRect.centerX(), sRect.centerY() + dp(4), popupTextPaint);
                           }
+                          // 5th Button: Toggle Gesture vs Shift Button Mode
+                          RectF mRect = new RectF(4 * sizeBtnW + dp(3), gridTop + dp(3), w - dp(3), gridTop + topControlsH - dp(3));
+                          spKeyPaint.setColor(Color.parseColor(useShiftKeyMode ? THEMES[themeIndex][8] : THEMES[themeIndex][4]));
+                          canvas.drawRoundRect(mRect, dp(5), dp(5), spKeyPaint);
+                          popupTextPaint.setColor(Color.WHITE);
+                          popupTextPaint.setTextSize(Math.min(dp(11), topControlsH * 0.32f));
+                          canvas.drawText(useShiftKeyMode ? "Mode: ⇧" : "Mode: អូស", mRect.centerX(), mRect.centerY() + dp(4), popupTextPaint);
 
-                          float colorAreaTop = gridTop + sizeBarH;
-                          float colorAreaH = gridH - sizeBarH;
+                          float colorAreaTop = gridTop + topControlsH;
+                          float colorAreaH = gridH - topControlsH;
                           float cardW = w / 4f;
                           float cardH = colorAreaH / 2f;
                           for (int i = 0; i < 8; i++) {
@@ -628,12 +752,12 @@ jobs:
                               float cy = colorAreaTop + r * cardH;
                               RectF card = new RectF(cx + dp(4), cy + dp(4), cx + cardW - dp(4), cy + cardH - dp(4));
                               keyPaint.setColor(Color.parseColor(THEMES[i][2]));
-                              canvas.drawRoundRect(card, dp(7), dp(7), keyPaint);
+                              canvas.drawRoundRect(card, dp(6), dp(6), keyPaint);
 
                               borderPaint.setColor(i == themeIndex ? Color.WHITE : Color.parseColor(THEMES[i][5]));
-                              borderPaint.setStrokeWidth(i == themeIndex ? 5f : 2f);
-                              canvas.drawRoundRect(card, dp(7), dp(7), borderPaint);
-                              borderPaint.setStrokeWidth(2f);
+                              borderPaint.setStrokeWidth(i == themeIndex ? 4f : 1.5f);
+                              canvas.drawRoundRect(card, dp(6), dp(6), borderPaint);
+                              borderPaint.setStrokeWidth(1.5f);
 
                               popupTextPaint.setColor(Color.parseColor(THEMES[i][6]));
                               popupTextPaint.setTextSize(Math.min(dp(12), cardH * 0.26f));
@@ -645,7 +769,6 @@ jobs:
                           return;
                       }
 
-                      // Smart Auto-Fitting Emoji Grid: Divide gridH into exact whole rows so emojis never get cut in half!
                       List<String> list = emojiLists[emojiCat];
                       int cols = 8;
                       int visibleRows = showNumberRow ? 4 : 3;
@@ -659,7 +782,7 @@ jobs:
 
                       canvas.save();
                       canvas.clipRect(0, gridTop, w, gridBottom);
-                      canvas.drawColor(Color.parseColor(THEMES[themeIndex][1]));
+                      canvas.drawColor(Color.parseColor(THEMES[themeIndex][2]));
 
                       topTextPaint.setTextSize(Math.min(dp(25), cellH * 0.54f));
                       int firstRow = Math.max(0, (int) (emojiScrollY / cellH));
@@ -686,10 +809,327 @@ jobs:
                       drawBottomBar(canvas, w, gridBottom, bottomH);
                   }
 
-                  private String getKeyChar(int row, int col, boolean bottom) {
-                      int idx = bottom ? 1 : 0;
+                  private String getKeyChar(int row, int col, boolean swipeSecondary) {
+                      boolean selectBottom = isShifted ? !swipeSecondary : swipeSecondary;
+                      int idx = selectBottom ? 1 : 0;
                       int rOffset = showNumberRow ? 1 : 0;
                       if (showNumberRow && row == 0) {
                           return (currentMode == MODE_EN) ? EN_NUMS[col][idx] : KH_NUMS[col][idx];
                       }
-                      int r = row - rOffset
+                      int r = row - rOffset;
+                      if (r < 0 || r >= 3 || col < 0 || col >= 10) return "";
+                      String[][][] active = (currentMode == MODE_KH) ? KH_ROWS :
+                                            (currentMode == MODE_EN) ? EN_ROWS : SYM_ROWS;
+                      return active[r][col][idx];
+                  }
+
+                  private void stopBackspaceRepeat() {
+                      isHoldingBackspace = false;
+                      handler.removeCallbacks(backspaceRepeater);
+                  }
+
+                  @Override
+                  public boolean onTouchEvent(MotionEvent event) {
+                      int action = event.getActionMasked();
+                      int w = getWidth();
+                      int h = getHeight();
+                      int totalRows = showNumberRow ? 5 : 4;
+                      float rowH = (float) h / totalRows;
+
+                      // Two-finger vertical swipe for Number Row
+                      if (event.getPointerCount() >= 2 && currentMode != MODE_EMOJI) {
+                          stopBackspaceRepeat();
+                          float dy0 = event.getY(0) - startY;
+                          float avgY = (event.getY(0) + event.getY(1)) / 2f;
+                          if (!twoFingerGesture) {
+                              // If user is typing fast with 2 thumbs on different keys, commit first key!
+                              if (action == MotionEvent.ACTION_POINTER_DOWN && Math.abs(dy0) < dp(15) && downRow >= 0 && downRow < totalRows - 1) {
+                                  InputConnection ic = getCurrentInputConnection();
+                                  if (ic != null) {
+                                      String text = getKeyChar(downRow, downCol, false);
+                                      if (!text.isEmpty()) ic.commitText(text, 1);
+                                      if (isShifted) isShifted = false;
+                                  }
+                                  int pIdx = event.getActionIndex();
+                                  startX = curX = event.getX(pIdx);
+                                  startY = curY = event.getY(pIdx);
+                                  downRow = (int) (startY / rowH);
+                                  downCol = (int) (startX / (w / 10f));
+                                  invalidate();
+                                  return true;
+                              }
+                              twoFingerGesture = true;
+                              twoFingerStartY = avgY;
+                          } else {
+                              float dy = avgY - twoFingerStartY;
+                              if (dy < -dp(25) && !showNumberRow) {
+                                  showNumberRow = true;
+                                  prefs.edit().putBoolean("show_num_row", true).apply();
+                                  requestLayout();
+                                  invalidate();
+                              } else if (dy > dp(25) && showNumberRow) {
+                                  showNumberRow = false;
+                                  prefs.edit().putBoolean("show_num_row", false).apply();
+                                  requestLayout();
+                                  invalidate();
+                              }
+                          }
+                          return true;
+                      }
+
+                      switch (action) {
+                          case MotionEvent.ACTION_DOWN:
+                              twoFingerGesture = false;
+                              isEmojiScrolling = false;
+                              isTouching = true;
+                              startX = curX = event.getX();
+                              startY = curY = lastY = event.getY();
+                              downRow = (int) (startY / rowH);
+                              downCol = (int) (startX / (w / 10f));
+                              performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+
+                              // Start continuous Hold-to-Delete if pressing ⌫
+                              float unit = w / 10f;
+                              if (downRow == totalRows - 1 && startX >= unit * 7.4f && startX < unit * 8.7f) {
+                                  isHoldingBackspace = true;
+                                  handler.postDelayed(backspaceRepeater, 400);
+                              }
+                              invalidate();
+                              break;
+
+                          case MotionEvent.ACTION_MOVE:
+                              curX = event.getX();
+                              curY = event.getY();
+                              if (isHoldingBackspace && (Math.abs(curX - startX) > dp(25) || Math.abs(curY - startY) > dp(25))) {
+                                  stopBackspaceRepeat();
+                              }
+                              float tabH = rowH * 0.68f;
+                              if (currentMode == MODE_EMOJI && emojiCat < 9 && startY >= tabH && startY <= h - rowH) {
+                                  if (!isEmojiScrolling && Math.abs(curY - startY) > dp(10) && Math.abs(curY - startY) > Math.abs(curX - startX)) {
+                                      isEmojiScrolling = true;
+                                  }
+                                  if (isEmojiScrolling) {
+                                      emojiScrollY -= (curY - lastY);
+                                      if (emojiScrollY < 0f) emojiScrollY = 0f;
+                                      if (emojiScrollY > maxEmojiScrollY) emojiScrollY = maxEmojiScrollY;
+                                  }
+                              }
+                              lastY = curY;
+                              invalidate();
+                              break;
+
+                          case MotionEvent.ACTION_UP:
+                          case MotionEvent.ACTION_CANCEL:
+                              boolean wasHoldingBksp = isHoldingBackspace;
+                              stopBackspaceRepeat();
+                              isTouching = false;
+                              if (twoFingerGesture) {
+                                  twoFingerGesture = false;
+                                  invalidate();
+                                  return true;
+                              }
+                              handleRelease(event.getX(), event.getY(), w, h, totalRows, rowH, wasHoldingBksp);
+                              isEmojiScrolling = false;
+                              downRow = -1;
+                              downCol = -1;
+                              invalidate();
+                              break;
+                      }
+                      return true;
+                  }
+
+                  private void handleRelease(float endX, float endY, int w, int h, int totalRows, float rowH, boolean wasHoldingBksp) {
+                      InputConnection ic = getCurrentInputConnection();
+                      if (ic == null) return;
+
+                      float dx = endX - startX;
+                      float dy = endY - startY;
+
+                      if (currentMode == MODE_EMOJI) {
+                          float tabH = rowH * 0.68f;
+                          float bottomTop = h - rowH;
+                          float gridH = bottomTop - tabH;
+
+                          if (isEmojiScrolling) return;
+
+                          if (startY >= tabH && startY < bottomTop && Math.abs(dx) > dp(55) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                              if (dx < 0 && emojiCat < 9) {
+                                  emojiCat++;
+                                  emojiScrollY = 0f;
+                              } else if (dx > 0 && emojiCat > 0) {
+                                  emojiCat--;
+                                  emojiScrollY = 0f;
+                              }
+                              return;
+                          }
+
+                          if (startY < tabH) {
+                              int cat = (int) (startX / (w / 10f));
+                              if (cat >= 0 && cat < 10) {
+                                  emojiCat = cat;
+                                  emojiScrollY = 0f;
+                              }
+                              return;
+                          }
+
+                          if (startY >= tabH && startY < bottomTop) {
+                              if (emojiCat == 9) {
+                                  float topControlsH = gridH * 0.30f;
+                                  if (startY < tabH + topControlsH) {
+                                      int btn = (int) (startX / (w / 5f));
+                                      if (btn >= 0 && btn < 4) {
+                                          applySize(btn);
+                                      } else if (btn == 4) {
+                                          useShiftKeyMode = !useShiftKeyMode;
+                                          isShifted = false;
+                                          prefs.edit().putBoolean("use_shift_key", useShiftKeyMode).apply();
+                                      }
+                                      return;
+                                  }
+                                  float colorAreaTop = tabH + topControlsH;
+                                  float colorAreaH = gridH - topControlsH;
+                                  int c = (int) (startX / (w / 4f));
+                                  int r = (int) ((startY - colorAreaTop) / (colorAreaH / 2f));
+                                  int chosenTheme = r * 4 + c;
+                                  if (chosenTheme >= 0 && chosenTheme < 8) {
+                                      applyTheme(chosenTheme);
+                                  }
+                                  return;
+                              }
+
+                              int cols = 8;
+                              int visibleRows = showNumberRow ? 4 : 3;
+                              float cellW = (w - dp(8)) / cols;
+                              float cellH = gridH / visibleRows;
+                              int c = (int) (startX / cellW);
+                              int r = (int) ((startY - tabH + emojiScrollY) / cellH);
+                              if (c >= 0 && c < cols && r >= 0) {
+                                  int idx = r * cols + c;
+                                  List<String> list = emojiLists[emojiCat];
+                                  if (idx >= 0 && idx < list.size()) {
+                                      String chosen = list.get(idx);
+                                      ic.commitText(chosen, 1);
+                                      recordRecentEmoji(chosen);
+                                  }
+                              }
+                              return;
+                          }
+
+                          handleBottomBar(ic, startX, dy, w, rowH, wasHoldingBksp);
+                          return;
+                      }
+
+                      // Global horizontal swipes (Swipe Left = Delete, Swipe Right = Symbols)
+                      if (Math.abs(dx) > dp(65) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                          if (dx < 0) {
+                              deleteOneChar(ic);
+                          } else {
+                              if (currentMode == MODE_SYM) {
+                                  currentMode = previousLangMode;
+                              } else {
+                                  previousLangMode = currentMode;
+                                  currentMode = MODE_SYM;
+                              }
+                          }
+                          return;
+                      }
+
+                      if (downRow == totalRows - 1) {
+                          handleBottomBar(ic, startX, dy, w, rowH, wasHoldingBksp);
+                          return;
+                      }
+
+                      boolean swipeDown = dy > rowH * 0.35f && Math.abs(dy) > Math.abs(dx);
+                      String text = getKeyChar(downRow, downCol, swipeDown);
+                      if (!text.isEmpty()) {
+                          ic.commitText(text, 1);
+                          if (isShifted && !swipeDown) {
+                              isShifted = false;
+                          }
+                      }
+                  }
+
+                  private void handleBottomBar(InputConnection ic, float x, float dy, int w, float rowH, boolean wasHoldingBksp) {
+                      float unit = w / 10f;
+                      if (x < unit * 1.15f) {
+                          if (dy < -rowH * 0.36f) {
+                              applyTheme((themeIndex + 1) % THEMES.length);
+                              return;
+                          }
+                          if (currentMode == MODE_EMOJI) {
+                              currentMode = previousLangMode;
+                          } else if (useShiftKeyMode) {
+                              isShifted = !isShifted;
+                          } else {
+                              previousLangMode = (currentMode == MODE_SYM) ? MODE_KH : currentMode;
+                              currentMode = MODE_EMOJI;
+                              emojiScrollY = 0f;
+                          }
+                          invalidate();
+                      } else if (x < unit * 2.3f) {
+                          if (useShiftKeyMode && currentMode != MODE_EMOJI) {
+                              previousLangMode = (currentMode == MODE_SYM) ? MODE_KH : currentMode;
+                              currentMode = MODE_EMOJI;
+                              emojiScrollY = 0f;
+                          } else {
+                              currentMode = (currentMode == MODE_EN) ? MODE_KH : MODE_EN;
+                              previousLangMode = currentMode;
+                              isShifted = false;
+                          }
+                          invalidate();
+                      } else if (x < unit * 7.4f) {
+                          if (dy < -rowH * 0.36f) {
+                              float midSpace = unit * 2.3f + (unit * 5.1f) / 2f;
+                              if (useShiftKeyMode && Math.abs(x - midSpace) < unit * 1.2f) {
+                                  currentMode = (currentMode == MODE_EN) ? MODE_KH : MODE_EN;
+                                  previousLangMode = currentMode;
+                                  isShifted = false;
+                              } else {
+                                  ic.commitText(x < midSpace ? "?" : "។", 1);
+                              }
+                          } else {
+                              ic.commitText(" ", 1);
+                          }
+                      } else if (x < unit * 8.7f) {
+                          if (wasHoldingBksp) {
+                              deleteOneChar(ic);
+                          }
+                      } else {
+                          sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER);
+                      }
+                  }
+
+                  private void deleteOneChar(InputConnection ic) {
+                      CharSequence selected = ic.getSelectedText(0);
+                      if (selected != null && selected.length() > 0) {
+                          ic.commitText("", 1);
+                      } else {
+                          sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL);
+                      }
+                  }
+              }
+          }
+          EOF
+
+      - name: Compile and Sign APK
+        run: |
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          PLATFORM=$(ls -d $ANDROID_HOME/platforms/android-* | sort -V | tail -n 1)
+
+          "$BUILD_TOOLS/aapt2" compile --dir res -o res.zip
+          "$BUILD_TOOLS/aapt2" link -o unaligned.apk -I "$PLATFORM/android.jar" --manifest AndroidManifest.xml --java gen res.zip
+
+          javac -encoding UTF-8 -source 8 -target 8 -cp "$PLATFORM/android.jar" -d obj src/com/khmer/keyboard/*.java gen/com/khmer/keyboard/R.java
+          "$BUILD_TOOLS/d8" --lib "$PLATFORM/android.jar" --output . obj/com/khmer/keyboard/*.class
+
+          zip -uj unaligned.apk classes.dex
+          "$BUILD_TOOLS/zipalign" -p -f 4 unaligned.apk aligned.apk
+
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          "$BUILD_TOOLS/apksigner" sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android --out KhmerEnglishEmojiKeyboard.apk aligned.apk
+
+      - name: Upload APK for Download
+        uses: actions/upload-artifact@v4
+        with:
+          name: Khmer-English-Emoji-Keyboard-APK
+          path: KhmerEnglishEmojiKeyboard.apk
