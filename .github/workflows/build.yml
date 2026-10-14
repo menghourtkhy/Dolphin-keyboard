@@ -1,0 +1,857 @@
+name: Build Khmer English Emoji 8-Color Keyboard APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Android Keyboard Project
+        run: |
+          mkdir -p src/com/khmer/keyboard res/xml res/values gen obj
+
+          cat << 'EOF' > AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.khmer.keyboard"
+              android:versionCode="3"
+              android:versionName="3.0">
+              <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="33" />
+              <application
+                  android:label="Khmer Gesture Keyboard"
+                  android:icon="@android:drawable/ic_dialog_dialer">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:label="Khmer Keyboard Setup">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <service
+                      android:name=".KhmerIME"
+                      android:label="Khmer Gesture Keyboard"
+                      android:permission="android.permission.BIND_INPUT_METHOD"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.view.InputMethod" />
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.view.im"
+                          android:resource="@xml/method" />
+                  </service>
+              </application>
+          </manifest>
+          EOF
+
+          cat << 'EOF' > res/xml/method.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <input-method xmlns:android="http://schemas.android.com/apk/res/android">
+              <subtype
+                  android:label="Khmer / English / Emoji"
+                  android:imeSubtypeLocale="km_KH"
+                  android:imeSubtypeMode="keyboard" />
+          </input-method>
+          EOF
+
+          cat << 'EOF' > src/com/khmer/keyboard/MainActivity.java
+          package com.khmer.keyboard;
+
+          import android.app.Activity;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.graphics.Color;
+          import android.os.Bundle;
+          import android.provider.Settings;
+          import android.view.Gravity;
+          import android.view.inputmethod.InputMethodManager;
+          import android.widget.Button;
+          import android.widget.EditText;
+          import android.widget.GridLayout;
+          import android.widget.LinearLayout;
+          import android.widget.ScrollView;
+          import android.widget.TextView;
+          import android.widget.Toast;
+
+          public class MainActivity extends Activity {
+              private static final String[] THEME_NAMES = {
+                  "White (ស)", "Dark Mode (ងងឹត)", "Red (ក្រហម)", "Blue (ខៀវ)",
+                  "Gold (មាស)", "Cherry (ឆឺរី)", "Orange (ទឹកក្រូច)", "Green (បៃតង)"
+              };
+              private static final String[] THEME_PREVIEW_COLORS = {
+                  "#FFFFFF", "#1E293B", "#B91C1C", "#1D4ED8",
+                  "#D97706", "#BE185D", "#EA580C", "#15803D"
+              };
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  SharedPreferences prefs = getSharedPreferences("khmer_emoji_prefs", Context.MODE_PRIVATE);
+
+                  ScrollView scroll = new ScrollView(this);
+                  scroll.setBackgroundColor(Color.parseColor("#F5F7FA"));
+
+                  LinearLayout layout = new LinearLayout(this);
+                  layout.setOrientation(LinearLayout.VERTICAL);
+                  layout.setPadding(40, 48, 40, 48);
+
+                  TextView title = new TextView(this);
+                  title.setText("ក្តារចុចខ្មែរ, អង់គ្លេស & Emoji (8 ពណ៌)");
+                  title.setTextSize(20);
+                  title.setTextColor(Color.parseColor("#1E293B"));
+                  title.setGravity(Gravity.CENTER);
+                  layout.addView(title);
+
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                  lp.setMargins(0, 24, 0, 12);
+
+                  Button btnEnable = new Button(this);
+                  btnEnable.setText("1. Enable Keyboard in Settings (បើកក្តារចុច)");
+                  btnEnable.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)));
+                  layout.addView(btnEnable, lp);
+
+                  Button btnSelect = new Button(this);
+                  btnSelect.setText("2. Select Khmer Gesture Keyboard (ជ្រើសរើសក្តារចុច)");
+                  btnSelect.setOnClickListener(v -> {
+                      InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                      if (imm != null) imm.showInputMethodPicker();
+                  });
+                  layout.addView(btnSelect, lp);
+
+                  TextView colorLabel = new TextView(this);
+                  colorLabel.setText("3. ជ្រើសរើសពណ៌ក្តារចុច (Choose Keyboard Color):");
+                  colorLabel.setTextSize(16);
+                  colorLabel.setTextColor(Color.parseColor("#334155"));
+                  layout.addView(colorLabel, lp);
+
+                  GridLayout grid = new GridLayout(this);
+                  grid.setColumnCount(2);
+                  for (int i = 0; i < THEME_NAMES.length; i++) {
+                      final int index = i;
+                      Button cBtn = new Button(this);
+                      cBtn.setText(THEME_NAMES[i]);
+                      cBtn.setBackgroundColor(Color.parseColor(THEME_PREVIEW_COLORS[i]));
+                      cBtn.setTextColor(i == 0 ? Color.parseColor("#111827") : Color.WHITE);
+                      GridLayout.LayoutParams glp = new GridLayout.LayoutParams();
+                      glp.width = 0;
+                      glp.height = GridLayout.LayoutParams.WRAP_CONTENT;
+                      glp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+                      glp.setMargins(8, 8, 8, 8);
+                      cBtn.setOnClickListener(v -> {
+                          prefs.edit().putInt("theme_index", index).apply();
+                          Toast.makeText(this, "Selected: " + THEME_NAMES[index], Toast.LENGTH_SHORT).show();
+                      });
+                      grid.addView(cBtn, glp);
+                  }
+                  layout.addView(grid, lp);
+
+                  EditText testBox = new EditText(this);
+                  testBox.setHint("សាកល្បងវាយអក្សរ និងប្តូរពណ៌ទីនេះ...");
+                  testBox.setMinLines(3);
+                  testBox.setGravity(Gravity.TOP | Gravity.START);
+                  layout.addView(testBox, lp);
+
+                  scroll.addView(layout);
+                  setContentView(scroll);
+              }
+          }
+          EOF
+
+          cat << 'EOF' > src/com/khmer/keyboard/KhmerIME.java
+          package com.khmer.keyboard;
+
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import android.graphics.Canvas;
+          import android.graphics.Color;
+          import android.graphics.Paint;
+          import android.graphics.RectF;
+          import android.inputmethodservice.InputMethodService;
+          import android.view.KeyEvent;
+          import android.view.MotionEvent;
+          import android.view.View;
+          import android.view.inputmethod.InputConnection;
+          import java.util.ArrayList;
+          import java.util.List;
+
+          public class KhmerIME extends InputMethodService {
+              private GestureKeyboardView kbView;
+
+              @Override
+              public View onCreateInputView() {
+                  kbView = new GestureKeyboardView(this);
+                  return kbView;
+              }
+
+              @Override
+              public void onWindowShown() {
+                  super.onWindowShown();
+                  if (kbView != null) {
+                      kbView.reloadThemeFromPrefs();
+                  }
+              }
+
+              private class GestureKeyboardView extends View {
+                  private static final int MODE_KH = 0;
+                  private static final int MODE_EN = 1;
+                  private static final int MODE_SYM = 2;
+                  private static final int MODE_EMOJI = 3;
+
+                  private int currentMode = MODE_KH;
+                  private int previousLangMode = MODE_KH;
+                  private boolean showNumberRow = false;
+
+                  private int emojiCat = 1;
+                  private float emojiScrollY = 0f;
+                  private float maxEmojiScrollY = 0f;
+                  private boolean isEmojiScrolling = false;
+
+                  private int themeIndex = 0;
+                  private final String[][] THEMES = {
+                      {"White (ស)", "#D1D5DB", "#FFFFFF", "#E2E8F0", "#B0B7C3", "#CBD5E1", "#111827", "#4B5563", "#1D4ED8"},
+                      {"Dark Mode (ងងឹត)", "#0F172A", "#1E293B", "#334155", "#334155", "#475569", "#F8FAFC", "#94A3B8", "#2563EB"},
+                      {"Red (ក្រហម)", "#7F1D1D", "#B91C1C", "#991B1B", "#991B1B", "#DC2626", "#FFFFFF", "#FECACA", "#EF4444"},
+                      {"Blue (ខៀវ)", "#1E3A8A", "#1D4ED8", "#1E40AF", "#1E40AF", "#3B82F6", "#FFFFFF", "#BFDBFE", "#0284C7"},
+                      {"Gold (មាស)", "#78350F", "#D97706", "#B45309", "#92400E", "#F59E0B", "#FFFFFF", "#FEF08A", "#CA8A04"},
+                      {"Cherry (ឆឺរី)", "#831843", "#BE185D", "#9D174D", "#9D174D", "#EC4899", "#FFFFFF", "#FBCFE8", "#E11D48"},
+                      {"Orange (ទឹកក្រូច)", "#7C2D12", "#EA580C", "#C2410C", "#9A3412", "#F97316", "#FFFFFF", "#FED7AA", "#D97706"},
+                      {"Green (បៃតង)", "#14532D", "#15803D", "#166534", "#166534", "#22C55E", "#FFFFFF", "#BBF7D0", "#059669"}
+                  };
+
+                  private float startX, startY, curX, curY, lastY;
+                  private boolean isTouching = false;
+                  private boolean twoFingerGesture = false;
+                  private float twoFingerStartY = 0;
+                  private int downRow = -1, downCol = -1;
+
+                  private final Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  private final Paint keyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  private final Paint spKeyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  private final Paint topTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  private final Paint botTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  private final Paint popupPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  private final Paint popupTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  private final Paint accentPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+                  @SuppressWarnings("unchecked")
+                  private final List<String>[] emojiLists = new ArrayList[9];
+                  private final String[] CAT_ICONS = {"🕒", "😀", "👋", "🐻", "🍔", "🚗", "⚽", "💡", "🇰🇭", "🎨"};
+                  private final SharedPreferences prefs;
+
+                  private final String[][][] KH_ROWS = {
+                      {{"ឆ","ឈ"},{"ឹ","ឺ"},{"េ","ែ"},{"រ","ឬ"},{"ត","ទ"},{"យ","ួ"},{"ុ","ូ"},{"ិ","ី"},{"ោ","ៅ"},{"ផ","ភ"}},
+                      {{"ា","ាំ"},{"ស","ៃ"},{"ដ","ឌ"},{"ថ","ធ"},{"ង","អ"},{"ហ","ះ"},{"្","ញ"},{"ក","គ"},{"ល","ឡ"},{"់","៉"}},
+                      {{"ើ","ោះ"},{"ឋ","ឍ"},{"ខ","ឃ"},{"ច","ជ"},{"វ","េះ"},{"ប","ព"},{"ន","ណ"},{"ម","ំ"},{"៊","ុះ"},{"ៀ","ឿ"}}
+                  };
+
+                  private final String[][] KH_NUMS = {
+                      {"១","!"},{"២","ៗ"},{"៣","៏"},{"៤","៛"},{"៥","%"},{"៦","័"},{"៧","៍"},{"៨","៎"},{"៩","៌"},{"០","ិ៍"}
+                  };
+
+                  private final String[][][] SYM_ROWS = {
+                      {{"!","1"},{"ៗ","2"},{"៏","3"},{"៛","4"},{"%","5"},{"៍","6"},{"័","7"},{"៎","8"},{"៌","9"},{"ិ៍","0"}},
+                      {{"&","១"},{"@","២"},{"ឥ","៣"},{"ឫ","៤"},{"ឮ","៥"},{"ឯ","៦"},{"ឧ","៧"},{"ឱ","៨"},{"ឪ","៩"},{"ឲ","០"}},
+                      {{".",";"},{",","$"},{"[","+"},{"]","-"},{"(","*"},{")","/"},{"ឳ","="},{"\"","'"},{":","៖"},{"៕","៘"}}
+                  };
+
+                  private final String[][][] EN_ROWS = {
+                      {{"q","Q"},{"w","W"},{"e","E"},{"r","R"},{"t","T"},{"y","Y"},{"u","U"},{"i","I"},{"o","O"},{"p","P"}},
+                      {{"a","A"},{"s","S"},{"d","D"},{"f","F"},{"g","G"},{"h","H"},{"j","J"},{"k","K"},{"l","L"},{"'","\""}},
+                      {{"z","Z"},{"x","X"},{"c","C"},{"v","V"},{"b","B"},{"n","N"},{"m","M"},{",",";"},{".",":"},{"/","?"}}
+                  };
+
+                  private final String[][] EN_NUMS = {
+                      {"1","!"},{"2","@"},{"3","#"},{"4","$"},{"5","%"},{"6","^"},{"7","&"},{"8","*"},{"9","("},{"0",")"}
+                  };
+
+                  public GestureKeyboardView(Context context) {
+                      super(context);
+                      prefs = context.getSharedPreferences("khmer_emoji_prefs", Context.MODE_PRIVATE);
+
+                      borderPaint.setStyle(Paint.Style.STROKE);
+                      borderPaint.setStrokeWidth(2f);
+                      topTextPaint.setTextAlign(Paint.Align.CENTER);
+                      botTextPaint.setTextAlign(Paint.Align.CENTER);
+                      popupTextPaint.setColor(Color.WHITE);
+                      popupTextPaint.setTextAlign(Paint.Align.CENTER);
+
+                      reloadThemeFromPrefs();
+                      initAllEmojis();
+                  }
+
+                  public void reloadThemeFromPrefs() {
+                      themeIndex = prefs.getInt("theme_index", 0);
+                      if (themeIndex < 0 || themeIndex >= THEMES.length) themeIndex = 0;
+                      applyTheme(themeIndex);
+                  }
+
+                  private void applyTheme(int idx) {
+                      themeIndex = idx;
+                      prefs.edit().putInt("theme_index", themeIndex).apply();
+                      String[] t = THEMES[themeIndex];
+                      bgPaint.setColor(Color.parseColor(t[1]));
+                      keyPaint.setColor(Color.parseColor(t[2]));
+                      spKeyPaint.setColor(Color.parseColor(t[4]));
+                      borderPaint.setColor(Color.parseColor(t[5]));
+                      topTextPaint.setColor(Color.parseColor(t[6]));
+                      botTextPaint.setColor(Color.parseColor(t[7]));
+                      accentPaint.setColor(Color.parseColor(t[8]));
+                      invalidate();
+                  }
+
+                  private void addRange(List<String> list, int start, int end) {
+                      for (int cp = start; cp <= end; cp++) {
+                          if (!Character.isDefined(cp)) continue;
+                          String s = new String(Character.toChars(cp));
+                          if (topTextPaint.hasGlyph(s) && !list.contains(s)) {
+                              list.add(s);
+                          }
+                      }
+                  }
+
+                  private void addItems(List<String> list, String... items) {
+                      for (String s : items) {
+                          if (topTextPaint.hasGlyph(s) && !list.contains(s)) {
+                              list.add(s);
+                          }
+                      }
+                  }
+
+                  private void initAllEmojis() {
+                      for (int i = 0; i < 9; i++) {
+                          emojiLists[i] = new ArrayList<>();
+                      }
+
+                      String saved = prefs.getString("recents", "😂,❤️,🙏,😭,😍,🥰,🔥,👍,🇰🇭,🎉,😊,😁,🤣,😘,🥺,🤩,👏,💯,✨,🪷,🍜,🧋,🛵,💰");
+                      for (String e : saved.split(",")) {
+                          if (!e.isEmpty()) emojiLists[0].add(e);
+                      }
+
+                      addRange(emojiLists[1], 0x1F600, 0x1F637);
+                      addRange(emojiLists[1], 0x1F910, 0x1F92F);
+                      addRange(emojiLists[1], 0x1F970, 0x1F97A);
+                      addRange(emojiLists[1], 0x1FAE0, 0x1FAEF);
+                      addRange(emojiLists[1], 0x1F638, 0x1F64F);
+                      addItems(emojiLists[1], "☺️","☹️","💀","☠️","💩","🤡","👹","👺","👻","👽","👾","🤖","💋","💌","💘","💝","💖","💗","💓","💞","💕","💟","❣️","💔","❤️","🧡","💛","💚","💙","💜","🤎","🖤","🤍","💯","💢","💥","💫","💦","💨","🕳️","💣","💬","💭","💤");
+
+                      addItems(emojiLists[2], "🙏","👍","👎","👌","🤌","🤏","✌️","🤞","🫰","🤟","🤘","🤙","👈","👉","👆","🖕","👇","☝️","🫵","👋","🤚","🖐️","✋","🖖","🫱","🫲","🫳","🫴","👐","🙌","🫶","🤲","🤝","🤜","🤛","✊","👊","✍️","👏","💅","🤳","💪","🦵","🦶","👂","🦻","👃","🧠","🫀","🫁","🦷","🦴","👀","👁️","👅","👄","🫦");
+                      addRange(emojiLists[2], 0x1F466, 0x1F487);
+                      addRange(emojiLists[2], 0x1F930, 0x1F93E);
+                      addRange(emojiLists[2], 0x1F9D1, 0x1F9DF);
+                      addRange(emojiLists[2], 0x1FAF0, 0x1FAF8);
+
+                      addRange(emojiLists[3], 0x1F400, 0x1F43F);
+                      addRange(emojiLists[3], 0x1F980, 0x1F9AE);
+                      addRange(emojiLists[3], 0x1FAB0, 0x1FABF);
+                      addRange(emojiLists[3], 0x1F330, 0x1F343);
+                      addRange(emojiLists[3], 0x1F300, 0x1F32C);
+                      addItems(emojiLists[3], "☀️","🌤️","⛅","🌥️","☁️","🌦️","🌧️","⛈️","🌩️","🌨️","❄️","☃️","⛄","🌬️","💨","☔","⚡","🌈","🔥","💧","🌊","✨","⭐","🌟","💫");
+
+                      addRange(emojiLists[4], 0x1F344, 0x1F37F);
+                      addRange(emojiLists[4], 0x1F950, 0x1F96F);
+                      addRange(emojiLists[4], 0x1F9C0, 0x1F9CB);
+                      addRange(emojiLists[4], 0x1FAD0, 0x1FAD9);
+                      addItems(emojiLists[4], "☕","🫖","🧋","🍵","🍶","🍾","🍷","🍸","🍹","🍺","🍻","🥂","🥃","🥤","🧊","🥢","🍽️","🍴","🥄","🔪","🏺");
+
+                      addRange(emojiLists[5], 0x1F680, 0x1F6C5);
+                      addRange(emojiLists[5], 0x1F6E0, 0x1F6EC);
+                      addRange(emojiLists[5], 0x1F6F4, 0x1F6FC);
+                      addRange(emojiLists[5], 0x1F3D4, 0x1F3FF);
+                      addRange(emojiLists[5], 0x1F54B, 0x1F54E);
+                      addRange(emojiLists[5], 0x1F5FA, 0x1F5FF);
+                      addItems(emojiLists[5], "✈️","🛫","🛬","🪂","💺","🚁","🚟","🚠","🚡","🛰️","🚀","🛸","🏛️","⛩️","🕌","🕍","🛕","⛪","⛲","⛺","🌁","🌃","🏙️","🌄","🌅","🌆","🌇","🌉","🎠","🎡","🎢");
+
+                      addRange(emojiLists[6], 0x1F380, 0x1F3CF);
+                      addRange(emojiLists[6], 0x1F93A, 0x1F94F);
+                      addRange(emojiLists[6], 0x1FA70, 0x1FA86);
+                      addItems(emojiLists[6], "⚽","⚾","🥎","🏀","🏐","🏈","🏉","🎾","🥏","🎳","🏏","🏑","🏒","🥍","🏓","🏸","🥊","🥋","🥅","⛳","⛸️","🎣","🤿","🎽","🎿","🛷","🥌","🎯","🪀","🪁","🎱","🔮","🪄","🎮","🕹️","🎰","🎲","🧩","🧸","🪅","🪩","🪆","♠️","♥️","♦️","♣️","♟️","🃏","🀄","🎴");
+
+                      addRange(emojiLists[7], 0x1F451, 0x1F465);
+                      addRange(emojiLists[7], 0x1F488, 0x1F4FF);
+                      addRange(emojiLists[7], 0x1F500, 0x1F53D);
+                      addRange(emojiLists[7], 0x1F570, 0x1F5A8);
+                      addRange(emojiLists[7], 0x1F5B1, 0x1F5E3);
+                      addRange(emojiLists[7], 0x1F97B, 0x1F97F);
+                      addRange(emojiLists[7], 0x1F9E0, 0x1F9FF);
+                      addRange(emojiLists[7], 0x1FA90, 0x1FAAC);
+                      addItems(emojiLists[7], "⌚","📱","📲","💻","⌨️","🖥️","🖨️","🖱️","🖲️","🕹️","🗜️","💽","💾","💿","📀","📼","📷","📸","📹","🎥","📽️","🎞️","📞","☎️","📟","📠","📺","📻","🎙️","🎚️","🎛️","🧭","⏱️","⏲️","⏰","🕰️","⌛","⏳","📡","🔋","🪫","🔌","💡","🔦","🕯️","🪔","🧯","🛢️","💸","💵","💴","💶","💷","🪙","💰","💳","💎","⚖️","🪜","🧰","🪛","🔧","🔨","⚒️","🛠️","⛏️","🪚","🔩","⚙️","🪤","🧱","⛓️","🧲","🔫","💣","🧨","🪓","🔪","🗡️","⚔️","🛡️","🚬","⚰️","🪦","⚱️");
+
+                      addItems(emojiLists[8], "🇰🇭","❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💟","✅","☑️","✔️","❌","❎","➕","➖","➗","✖️","♾️","❓","❔","❕","❗","〰️","💱","💲","⚕️","♻️","⚜️","🔱","📛","🔰","⭕","🛑","⛔","🚫","💯","💢","♨️","⬆️","↗️","➡️","↘️","⬇️","↙️","⬅️","↖️","↕️","↔️","↩️","↪️","⤴️","⤵️","🔃","🔄","🔙","🔚","🔛","🔜","🔝","☸️","🕉️","☯️","✝️","☪️","☮️","🏁","🚩","🎌","🏴","🏳️");
+                      String[] priorityCountries = {"KH","US","GB","FR","JP","KR","CN","TH","VN","LA","SG","MY","ID","PH","MM","BN","AU","CA","DE","IT","ES","BR","IN","RU"};
+                      for (String code : priorityCountries) {
+                          addItems(emojiLists[8], countryCodeToFlag(code));
+                      }
+                      for (char c1 = 'A'; c1 <= 'Z'; c1++) {
+                          for (char c2 = 'A'; c2 <= 'Z'; c2++) {
+                              addItems(emojiLists[8], countryCodeToFlag("" + c1 + c2));
+                          }
+                      }
+                  }
+
+                  private String countryCodeToFlag(String code) {
+                      int first = Character.codePointAt(code, 0) - 'A' + 0x1F1E6;
+                      int second = Character.codePointAt(code, 1) - 'A' + 0x1F1E6;
+                      return new String(Character.toChars(first)) + new String(Character.toChars(second));
+                  }
+
+                  private void recordRecentEmoji(String emoji) {
+                      emojiLists[0].remove(emoji);
+                      emojiLists[0].add(0, emoji);
+                      if (emojiLists[0].size() > 48) {
+                          emojiLists[0].remove(emojiLists[0].size() - 1);
+                      }
+                      StringBuilder sb = new StringBuilder();
+                      for (int i = 0; i < emojiLists[0].size(); i++) {
+                          if (i > 0) sb.append(",");
+                          sb.append(emojiLists[0].get(i));
+                      }
+                      prefs.edit().putString("recents", sb.toString()).apply();
+                  }
+
+                  private float dp(float v) {
+                      return v * getResources().getDisplayMetrics().density;
+                  }
+
+                  @Override
+                  protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+                      int w = MeasureSpec.getSize(widthMeasureSpec);
+                      int rows = (showNumberRow && currentMode != MODE_EMOJI) ? 5 : 4;
+                      int h = (int) (rows * dp(60));
+                      setMeasuredDimension(w, h);
+                  }
+
+                  @Override
+                  protected void onDraw(Canvas canvas) {
+                      super.onDraw(canvas);
+                      int w = getWidth();
+                      int h = getHeight();
+                      canvas.drawRect(0, 0, w, h, bgPaint);
+
+                      if (currentMode == MODE_EMOJI) {
+                          drawEmojiOrThemeMode(canvas, w, h);
+                          return;
+                      }
+
+                      int totalRows = showNumberRow ? 5 : 4;
+                      float rowH = (float) h / totalRows;
+                      float colW = (float) w / 10f;
+
+                      topTextPaint.setTextSize(dp(20));
+                      botTextPaint.setTextSize(dp(13));
+
+                      int rOffset = 0;
+                      if (showNumberRow) {
+                          String[][] nums = (currentMode == MODE_EN) ? EN_NUMS : KH_NUMS;
+                          for (int c = 0; c < 10; c++) {
+                              drawDualKey(canvas, c * colW, 0, colW, rowH, nums[c][0], nums[c][1], false);
+                          }
+                          rOffset = 1;
+                      }
+
+                      String[][][] activeRows = (currentMode == MODE_KH) ? KH_ROWS :
+                                                 (currentMode == MODE_EN) ? EN_ROWS : SYM_ROWS;
+
+                      for (int r = 0; r < 3; r++) {
+                          float y = (r + rOffset) * rowH;
+                          for (int c = 0; c < 10; c++) {
+                              boolean pressed = isTouching && (downRow == r + rOffset) && (downCol == c);
+                              drawDualKey(canvas, c * colW, y, colW, rowH, activeRows[r][c][0], activeRows[r][c][1], pressed);
+                          }
+                      }
+
+                      drawBottomBar(canvas, w, (totalRows - 1) * rowH, rowH);
+
+                      if (isTouching && !twoFingerGesture && downRow >= 0 && downRow < totalRows - 1 && downCol >= 0) {
+                          boolean swipingDown = (curY - startY) > dp(24);
+                          String preview = getKeyChar(downRow, downCol, swipingDown);
+                          if (!preview.isEmpty()) {
+                              float px = (downCol + 0.5f) * colW;
+                              float py = downRow * rowH;
+                              RectF popRect = new RectF(px - dp(28), Math.max(dp(4), py - dp(56)), px + dp(28), py + dp(6));
+                              popupPaint.setColor(swipingDown ? Color.parseColor(THEMES[themeIndex][8]) : Color.parseColor("#475569"));
+                              canvas.drawRoundRect(popRect, dp(8), dp(8), popupPaint);
+                              popupTextPaint.setTextSize(dp(24));
+                              canvas.drawText(preview, popRect.centerX(), popRect.centerY() + dp(8), popupTextPaint);
+                          }
+                      }
+                  }
+
+                  private void drawDualKey(Canvas canvas, float x, float y, float w, float h, String top, String bot, boolean pressed) {
+                      RectF rect = new RectF(x + 1.5f, y + 1.5f, x + w - 1.5f, y + h - 1.5f);
+                      keyPaint.setColor(Color.parseColor(pressed ? THEMES[themeIndex][3] : THEMES[themeIndex][2]));
+                      canvas.drawRoundRect(rect, dp(5), dp(5), keyPaint);
+                      canvas.drawRoundRect(rect, dp(5), dp(5), borderPaint);
+                      canvas.drawText(top, x + w / 2f, y + h * 0.46f, topTextPaint);
+                      canvas.drawText(bot, x + w / 2f, y + h * 0.82f, botTextPaint);
+                  }
+
+                  private void drawBottomBar(Canvas canvas, int w, float y, float rowH) {
+                      float unit = w / 10f;
+                      topTextPaint.setTextSize(dp(18));
+
+                      drawSpecialKey(canvas, 0, y, unit, rowH, currentMode == MODE_EMOJI ? "ក/A" : "😊", false);
+                      String globeLabel = (currentMode == MODE_EN) ? "🌐 EN" : "🌐 ខ្មែរ";
+                      drawSpecialKey(canvas, unit, y, unit * 1.3f, rowH, globeLabel, false);
+
+                      float spX = unit * 2.3f;
+                      float spW = unit * 5.1f;
+                      RectF spRect = new RectF(spX + 1.5f, y + 1.5f, spX + spW - 1.5f, y + rowH - 1.5f);
+                      keyPaint.setColor(Color.parseColor(THEMES[themeIndex][2]));
+                      canvas.drawRoundRect(spRect, dp(5), dp(5), keyPaint);
+                      canvas.drawRoundRect(spRect, dp(5), dp(5), borderPaint);
+                      topTextPaint.setTextSize(dp(18));
+                      canvas.drawText("?", spX + dp(18), y + rowH * 0.62f, topTextPaint);
+                      canvas.drawText("។", spX + spW - dp(18), y + rowH * 0.62f, topTextPaint);
+
+                      float delX = unit * 7.4f;
+                      drawSpecialKey(canvas, delX, y, unit * 1.3f, rowH, "⌫", false);
+
+                      float entX = unit * 8.7f;
+                      drawSpecialKey(canvas, entX, y, unit * 1.3f, rowH, "↵", false);
+                  }
+
+                  private void drawSpecialKey(Canvas canvas, float x, float y, float w, float h, String label, boolean highlight) {
+                      RectF rect = new RectF(x + 1.5f, y + 1.5f, x + w - 1.5f, y + h - 1.5f);
+                      spKeyPaint.setColor(Color.parseColor(highlight ? THEMES[themeIndex][8] : THEMES[themeIndex][4]));
+                      canvas.drawRoundRect(rect, dp(5), dp(5), spKeyPaint);
+                      canvas.drawRoundRect(rect, dp(5), dp(5), borderPaint);
+                      topTextPaint.setTextSize(dp(15));
+                      canvas.drawText(label, x + w / 2f, y + h * 0.62f, topTextPaint);
+                  }
+
+                  private void drawEmojiOrThemeMode(Canvas canvas, int w, int h) {
+                      float tabH = dp(40);
+                      float bottomH = dp(56);
+                      float gridTop = tabH;
+                      float gridBottom = h - bottomH;
+                      float gridH = gridBottom - gridTop;
+
+                      float tabW = w / 10f;
+                      spKeyPaint.setColor(Color.parseColor(THEMES[themeIndex][4]));
+                      canvas.drawRect(0, 0, w, tabH, spKeyPaint);
+                      topTextPaint.setTextSize(dp(18));
+                      for (int i = 0; i < 10; i++) {
+                          float tx = i * tabW;
+                          if (i == emojiCat) {
+                              canvas.drawRect(tx + dp(4), tabH - dp(3), tx + tabW - dp(4), tabH, accentPaint);
+                          }
+                          canvas.drawText(CAT_ICONS[i], tx + tabW / 2f, tabH * 0.68f, topTextPaint);
+                      }
+
+                      if (emojiCat == 9) {
+                          float cardW = w / 4f;
+                          float cardH = gridH / 2f;
+                          for (int i = 0; i < 8; i++) {
+                              int r = i / 4;
+                              int c = i % 4;
+                              float cx = c * cardW;
+                              float cy = gridTop + r * cardH;
+                              RectF card = new RectF(cx + dp(5), cy + dp(5), cx + cardW - dp(5), cy + cardH - dp(5));
+                              keyPaint.setColor(Color.parseColor(THEMES[i][2]));
+                              canvas.drawRoundRect(card, dp(8), dp(8), keyPaint);
+
+                              borderPaint.setColor(i == themeIndex ? Color.WHITE : Color.parseColor(THEMES[i][5]));
+                              borderPaint.setStrokeWidth(i == themeIndex ? 5f : 2f);
+                              canvas.drawRoundRect(card, dp(8), dp(8), borderPaint);
+                              borderPaint.setStrokeWidth(2f);
+
+                              popupTextPaint.setColor(Color.parseColor(THEMES[i][6]));
+                              popupTextPaint.setTextSize(dp(12));
+                              canvas.drawText(THEMES[i][0], card.centerX(), card.centerY() + dp(4), popupTextPaint);
+                          }
+                          popupTextPaint.setColor(Color.WHITE);
+                          borderPaint.setColor(Color.parseColor(THEMES[themeIndex][5]));
+                          drawBottomBar(canvas, w, gridBottom, bottomH);
+                          return;
+                      }
+
+                      List<String> list = emojiLists[emojiCat];
+                      int cols = 8;
+                      int totalRows = (int) Math.ceil(list.size() / (float) cols);
+                      float cellW = (w - dp(8)) / cols;
+                      float cellH = dp(44);
+
+                      maxEmojiScrollY = Math.max(0f, totalRows * cellH - gridH);
+                      if (emojiScrollY > maxEmojiScrollY) emojiScrollY = maxEmojiScrollY;
+                      if (emojiScrollY < 0f) emojiScrollY = 0f;
+
+                      canvas.save();
+                      canvas.clipRect(0, gridTop, w, gridBottom);
+                      canvas.drawColor(Color.parseColor(THEMES[themeIndex][1]));
+
+                      topTextPaint.setTextSize(dp(24));
+                      int firstRow = Math.max(0, (int) (emojiScrollY / cellH));
+                      int lastRow = Math.min(totalRows - 1, (int) ((emojiScrollY + gridH) / cellH) + 1);
+
+                      for (int r = firstRow; r <= lastRow; r++) {
+                          float cy = gridTop + r * cellH - emojiScrollY;
+                          for (int c = 0; c < cols; c++) {
+                              int idx = r * cols + c;
+                              if (idx >= list.size()) break;
+                              float cx = c * cellW;
+                              canvas.drawText(list.get(idx), cx + cellW / 2f, cy + cellH * 0.72f, topTextPaint);
+                          }
+                      }
+
+                      if (maxEmojiScrollY > 0) {
+                          float thumbH = Math.max(dp(24), gridH * (gridH / (totalRows * cellH)));
+                          float thumbY = gridTop + (emojiScrollY / maxEmojiScrollY) * (gridH - thumbH);
+                          RectF bar = new RectF(w - dp(5), thumbY, w - dp(2), thumbY + thumbH);
+                          canvas.drawRoundRect(bar, dp(2), dp(2), accentPaint);
+                      }
+                      canvas.restore();
+
+                      drawBottomBar(canvas, w, gridBottom, bottomH);
+                  }
+
+                  private String getKeyChar(int row, int col, boolean bottom) {
+                      int idx = bottom ? 1 : 0;
+                      int rOffset = showNumberRow ? 1 : 0;
+                      if (showNumberRow && row == 0) {
+                          return (currentMode == MODE_EN) ? EN_NUMS[col][idx] : KH_NUMS[col][idx];
+                      }
+                      int r = row - rOffset;
+                      if (r < 0 || r >= 3 || col < 0 || col >= 10) return "";
+                      String[][][] active = (currentMode == MODE_KH) ? KH_ROWS :
+                                            (currentMode == MODE_EN) ? EN_ROWS : SYM_ROWS;
+                      return active[r][col][idx];
+                  }
+
+                  @Override
+                  public boolean onTouchEvent(MotionEvent event) {
+                      int action = event.getActionMasked();
+                      int w = getWidth();
+                      int h = getHeight();
+                      int totalRows = (showNumberRow && currentMode != MODE_EMOJI) ? 5 : 4;
+                      float rowH = (float) h / totalRows;
+
+                      if (event.getPointerCount() >= 2 && currentMode != MODE_EMOJI) {
+                          float avgY = (event.getY(0) + event.getY(1)) / 2f;
+                          if (!twoFingerGesture) {
+                              twoFingerGesture = true;
+                              twoFingerStartY = avgY;
+                          } else {
+                              float dy = avgY - twoFingerStartY;
+                              if (dy < -dp(25) && !showNumberRow) {
+                                  showNumberRow = true;
+                                  requestLayout();
+                                  invalidate();
+                              } else if (dy > dp(25) && showNumberRow) {
+                                  showNumberRow = false;
+                                  requestLayout();
+                                  invalidate();
+                              }
+                          }
+                          return true;
+                      }
+
+                      switch (action) {
+                          case MotionEvent.ACTION_DOWN:
+                              twoFingerGesture = false;
+                              isEmojiScrolling = false;
+                              isTouching = true;
+                              startX = curX = event.getX();
+                              startY = curY = lastY = event.getY();
+                              downRow = (int) (startY / rowH);
+                              downCol = (int) (startX / (w / 10f));
+                              invalidate();
+                              break;
+
+                          case MotionEvent.ACTION_MOVE:
+                              curX = event.getX();
+                              curY = event.getY();
+                              if (currentMode == MODE_EMOJI && emojiCat < 9 && startY >= dp(40) && startY <= h - dp(56)) {
+                                  if (!isEmojiScrolling && Math.abs(curY - startY) > dp(10) && Math.abs(curY - startY) > Math.abs(curX - startX)) {
+                                      isEmojiScrolling = true;
+                                  }
+                                  if (isEmojiScrolling) {
+                                      emojiScrollY -= (curY - lastY);
+                                      if (emojiScrollY < 0f) emojiScrollY = 0f;
+                                      if (emojiScrollY > maxEmojiScrollY) emojiScrollY = maxEmojiScrollY;
+                                  }
+                              }
+                              lastY = curY;
+                              invalidate();
+                              break;
+
+                          case MotionEvent.ACTION_UP:
+                              isTouching = false;
+                              if (twoFingerGesture) {
+                                  twoFingerGesture = false;
+                                  invalidate();
+                                  return true;
+                              }
+                              handleRelease(event.getX(), event.getY(), w, h, totalRows, rowH);
+                              isEmojiScrolling = false;
+                              downRow = -1;
+                              downCol = -1;
+                              invalidate();
+                              break;
+                      }
+                      return true;
+                  }
+
+                  private void handleRelease(float endX, float endY, int w, int h, int totalRows, float rowH) {
+                      InputConnection ic = getCurrentInputConnection();
+                      if (ic == null) return;
+
+                      float dx = endX - startX;
+                      float dy = endY - startY;
+
+                      if (currentMode == MODE_EMOJI) {
+                          float tabH = dp(40);
+                          float bottomTop = h - dp(56);
+
+                          if (isEmojiScrolling) return;
+
+                          if (startY >= tabH && startY < bottomTop && Math.abs(dx) > dp(55) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                              if (dx < 0 && emojiCat < 9) {
+                                  emojiCat++;
+                                  emojiScrollY = 0f;
+                              } else if (dx > 0 && emojiCat > 0) {
+                                  emojiCat--;
+                                  emojiScrollY = 0f;
+                              }
+                              return;
+                          }
+
+                          if (startY < tabH) {
+                              int cat = (int) (startX / (w / 10f));
+                              if (cat >= 0 && cat < 10) {
+                                  emojiCat = cat;
+                                  emojiScrollY = 0f;
+                              }
+                              return;
+                          }
+
+                          if (startY >= tabH && startY < bottomTop) {
+                              if (emojiCat == 9) {
+                                  int c = (int) (startX / (w / 4f));
+                                  int r = (int) ((startY - tabH) / ((bottomTop - tabH) / 2f));
+                                  int chosenTheme = r * 4 + c;
+                                  if (chosenTheme >= 0 && chosenTheme < 8) {
+                                      applyTheme(chosenTheme);
+                                  }
+                                  return;
+                              }
+
+                              int cols = 8;
+                              float cellW = (w - dp(8)) / cols;
+                              float cellH = dp(44);
+                              int c = (int) (startX / cellW);
+                              int r = (int) ((startY - tabH + emojiScrollY) / cellH);
+                              if (c >= 0 && c < cols && r >= 0) {
+                                  int idx = r * cols + c;
+                                  List<String> list = emojiLists[emojiCat];
+                                  if (idx >= 0 && idx < list.size()) {
+                                      String chosen = list.get(idx);
+                                      ic.commitText(chosen, 1);
+                                      recordRecentEmoji(chosen);
+                                  }
+                              }
+                              return;
+                          }
+
+                          handleBottomBar(ic, startX, dy, w);
+                          return;
+                      }
+
+                      if (Math.abs(dx) > dp(65) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                          if (dx < 0) {
+                              deleteOneChar(ic);
+                          } else {
+                              if (currentMode == MODE_SYM) {
+                                  currentMode = previousLangMode;
+                              } else {
+                                  previousLangMode = currentMode;
+                                  currentMode = MODE_SYM;
+                              }
+                          }
+                          return;
+                      }
+
+                      if (downRow == totalRows - 1) {
+                          handleBottomBar(ic, startX, dy, w);
+                          return;
+                      }
+
+                      boolean swipeDown = dy > dp(24) && Math.abs(dy) > Math.abs(dx);
+                      String text = getKeyChar(downRow, downCol, swipeDown);
+                      if (!text.isEmpty()) {
+                          ic.commitText(text, 1);
+                      }
+                  }
+
+                  private void handleBottomBar(InputConnection ic, float x, float dy, int w) {
+                      float unit = w / 10f;
+                      if (x < unit) {
+                          if (dy < -dp(22)) {
+                              applyTheme((themeIndex + 1) % THEMES.length);
+                              return;
+                          }
+                          if (currentMode == MODE_EMOJI) {
+                              currentMode = previousLangMode;
+                          } else {
+                              previousLangMode = (currentMode == MODE_SYM) ? MODE_KH : currentMode;
+                              currentMode = MODE_EMOJI;
+                              emojiScrollY = 0f;
+                          }
+                          requestLayout();
+                      } else if (x < unit * 2.3f) {
+                          currentMode = (currentMode == MODE_EN) ? MODE_KH : MODE_EN;
+                          previousLangMode = currentMode;
+                          requestLayout();
+                      } else if (x < unit * 7.4f) {
+                          if (dy < -dp(22)) {
+                              float midSpace = unit * 2.3f + (unit * 5.1f) / 2f;
+                              ic.commitText(x < midSpace ? "?" : "។", 1);
+                          } else {
+                              ic.commitText(" ", 1);
+                          }
+                      } else if (x < unit * 8.7f) {
+                          deleteOneChar(ic);
+                      } else {
+                          sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER);
+                      }
+                  }
+
+                  private void deleteOneChar(InputConnection ic) {
+                      CharSequence selected = ic.getSelectedText(0);
+                      if (selected != null && selected.length() > 0) {
+                          ic.commitText("", 1);
+                      } else {
+                          sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL);
+                      }
+                  }
+              }
+          }
+          EOF
+
+      - name: Compile and Sign APK
+        run: |
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          PLATFORM=$(ls -d $ANDROID_HOME/platforms/android-* | sort -V | tail -n 1)
+
+          "$BUILD_TOOLS/aapt2" compile --dir res -o res.zip
+          "$BUILD_TOOLS/aapt2" link -o unaligned.apk -I "$PLATFORM/android.jar" --manifest AndroidManifest.xml --java gen res.zip
+
+          javac -encoding UTF-8 -source 8 -target 8 -cp "$PLATFORM/android.jar" -d obj src/com/khmer/keyboard/*.java gen/com/khmer/keyboard/R.java
+          "$BUILD_TOOLS/d8" --lib "$PLATFORM/android.jar" --output . obj/com/khmer/keyboard/*.class
+
+          zip -uj unaligned.apk classes.dex
+          "$BUILD_TOOLS/zipalign" -p -f 4 unaligned.apk aligned.apk
+
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          "$BUILD_TOOLS/apksigner" sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android --out KhmerEnglishEmojiKeyboard.apk aligned.apk
+
+      - name: Upload APK for Download
+        uses: actions/upload-artifact@v4
+        with:
+          name: Khmer-English-Emoji-Keyboard-APK
+          path: KhmerEnglishEmojiKeyboard.apk
