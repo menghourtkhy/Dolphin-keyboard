@@ -16,8 +16,8 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.khmer.keyboard"
-              android:versionCode="6"
-              android:versionName="6.0">
+              android:versionCode="7"
+              android:versionName="7.0">
               <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="33" />
               <application
                   android:label="Khmer NiDA Keyboard"
@@ -104,7 +104,7 @@ jobs:
                   layout.setPadding(40, 48, 40, 48);
 
                   TextView title = new TextView(this);
-                  title.setText("ក្តារចុចខ្មែរ NiDA (Smooth Edition)");
+                  title.setText("ក្តារចុចខ្មែរ NiDA (Unicode Standard)");
                   title.setTextSize(20);
                   title.setTextColor(Color.parseColor("#1E293B"));
                   title.setGravity(Gravity.CENTER);
@@ -211,7 +211,7 @@ jobs:
                   layout.addView(grid, lp);
 
                   EditText testBox = new EditText(this);
-                  testBox.setHint("សាកល្បងវាយអក្សរ NiDA ទីនេះ...");
+                  testBox.setHint("សាកល្បងលេខ និងសញ្ញាពិសេសខ្មែរ (១២៣៤៥៦៧៨៩០ ៗ ៏ ៛ ៍ ័ ៎ ៌ ៑)...");
                   testBox.setMinLines(3);
                   testBox.setGravity(Gravity.TOP | Gravity.START);
                   layout.addView(testBox, lp);
@@ -352,20 +352,66 @@ jobs:
                   private final String[] CAT_ICONS = {"🕒", "😀", "👋", "🐻", "🍔", "🚗", "⚽", "💡", "🇰🇭", "🎨"};
                   private final SharedPreferences prefs;
 
+                  // Main Khmer NiDA Rows (Official Unicode codepoints)
                   private final String[][][] KH_ROWS = {
                       {{"ឆ","ឈ"},{"ឹ","ឺ"},{"េ","ែ"},{"រ","ឬ"},{"ត","ទ"},{"យ","ួ"},{"ុ","ូ"},{"ិ","ី"},{"ោ","ៅ"},{"ផ","ភ"}},
                       {{"ា","ាំ"},{"ស","ៃ"},{"ដ","ឌ"},{"ថ","ធ"},{"ង","អ"},{"ហ","ះ"},{"្","ញ"},{"ក","គ"},{"ល","ឡ"},{"់","៉"}},
                       {{"ឋ","ឍ"},{"ខ","ឃ"},{"ច","ជ"},{"វ","េះ"},{"ប","ព"},{"ន","ណ"},{"ម","ំ"},{"៊","ុះ"},{"ៀ","ឿ"},{"ើ","ោះ"}}
                   };
 
+                  // Official Khmer Unicode Digits (U+17E0..U+17E9) & Special Signs:
+                  // ១/! | ២/ៗ (U+17D7) | ៣/៏ (U+17CF) | ៤/៛ (U+17DB) | ៥/% | ៦/៍ (U+17CD) | ៧/័ (U+17D0) | ៨/៎ (U+17CE) | ៩/៌ (U+17CC) | ០/៑ (U+17D1 Viriam)
                   private final String[][] KH_NUMS = {
-                      {"១","!"},{"២","ៗ"},{"៣","៏"},{"៤","៛"},{"៥","%"},{"៦","័"},{"៧","៍"},{"៨","៎"},{"៩","៌"},{"០","ិ៍"}
+                      {"\u17E1", "!"},
+                      {"\u17E2", "\u17D7"},
+                      {"\u17E3", "\u17CF"},
+                      {"\u17E4", "\u17DB"},
+                      {"\u17E5", "%"},
+                      {"\u17E6", "\u17CD"},
+                      {"\u17E7", "\u17D0"},
+                      {"\u17E8", "\u17CE"},
+                      {"\u17E9", "\u17CC"},
+                      {"\u17E0", "\u17D1"}
                   };
 
+                  // Complete Khmer Symbols, Independent Vowels & Classical Signs (U+17A5..U+17DC)
                   private final String[][][] SYM_ROWS = {
-                      {{"!","1"},{"ៗ","2"},{"៏","3"},{"៛","4"},{"%","5"},{"៍","6"},{"័","7"},{"៎","8"},{"៌","9"},{"ិ៍","0"}},
-                      {{"&","១"},{"@","២"},{"ឥ","៣"},{"ឫ","៤"},{"ឮ","៥"},{"ឯ","៦"},{"ឧ","៧"},{"ឱ","៨"},{"ឪ","៩"},{"ឲ","០"}},
-                      {{".",";"},{",","$"},{"[","+"},{"]","-"},{"(","*"},{")","/"},{"ឳ","="},{"\"","'"},{":","៖"},{"៕","៘"}}
+                      {
+                          {"!", "1"},
+                          {"\u17D7", "2"},
+                          {"\u17CF", "3"},
+                          {"\u17DB", "4"},
+                          {"%", "5"},
+                          {"\u17CD", "6"},
+                          {"\u17D0", "7"},
+                          {"\u17CE", "8"},
+                          {"\u17CC", "9"},
+                          {"\u17D1", "0"}
+                      },
+                      {
+                          {"\u17D9", "\u17E1"}, // ៙ (Phnaek Muan) / ១
+                          {"\u17DA", "\u17E2"}, // ៚ (Koomuut) / ២
+                          {"\u17A5", "\u17E3"}, // ឥ / ៣
+                          {"\u17AB", "\u17E4"}, // ឫ / ៤
+                          {"\u17AD", "\u17E5"}, // ឮ / ៥
+                          {"\u17AF", "\u17E6"}, // ឯ / ៦
+                          {"\u17A7", "\u17E7"}, // ឧ / ៧
+                          {"\u17B1", "\u17E8"}, // ឱ / ៨
+                          {"\u17AA", "\u17E9"}, // ឪ / ៩
+                          {"\u17B2", "\u17E0"}  // ឲ / ០
+                      },
+                      {
+                          {"\u00AB", "\u00BB"}, // « / » (Khmer Quotes)
+                          {",", "$"},
+                          {"[", "+"},
+                          {"]", "-"},
+                          {"(", "\u17AC"},      // ( / ឬ
+                          {")", "\u17AE"},      // ) / ឮ
+                          {"\u17B3", "\u17DC"}, // ឳ / ៜ (Avakrahasannya)
+                          {"\"", "'"},
+                          {":", "\u17D6"},      // : / ៖ (Camnuc Pii Kuuh)
+                          {"\u17D5", "\u17D8"}  // ៕ (Bariyoosan) / ៘ (Beyyal)
+                      }
                   };
 
                   private final String[][][] EN_ROWS = {
@@ -631,6 +677,21 @@ jobs:
                       return Color.rgb(r, g, b);
                   }
 
+                  // Format Khmer combining marks with a clean dotted circle for keycap & popup display
+                  private String formatDisplayLabel(String raw) {
+                      if (raw == null || raw.isEmpty()) return "";
+                      if (raw.length() == 1) {
+                          char ch = raw.charAt(0);
+                          if ((ch >= '\u17B6' && ch <= '\u17D3') || ch == '\u17DD') {
+                              return "\u25CC" + raw;
+                          }
+                      } else if (raw.equals("\u17B6\u17C6") || raw.equals("\u17BB\u17C7") ||
+                                 raw.equals("\u17C1\u17C7") || raw.equals("\u17C4\u17C7")) {
+                          return "\u25CC" + raw;
+                      }
+                      return raw;
+                  }
+
                   @Override
                   protected void onDraw(Canvas canvas) {
                       super.onDraw(canvas);
@@ -699,8 +760,8 @@ jobs:
                               swipeMorphProgress = targetMorph;
                           }
 
-                          String topChar = getKeyChar(downRow, downCol, false);
-                          String botChar = getKeyChar(downRow, downCol, true);
+                          String topChar = formatDisplayLabel(getKeyChar(downRow, downCol, false));
+                          String botChar = formatDisplayLabel(getKeyChar(downRow, downCol, true));
                           float cx = (downCol + 0.5f) * colW;
                           float keyTopY = downRow * rowH;
 
@@ -732,8 +793,8 @@ jobs:
                               canvas.drawPath(popupPath, popupPaint);
 
                               popupTextPaint.setColor(Color.WHITE);
-                              popupTextPaint.setTextSize(rowH * 0.42f);
-                              canvas.drawText(botChar, left + pw / 2f, bottom - ph * 0.26f, popupTextPaint);
+                              popupTextPaint.setTextSize(rowH * 0.40f);
+                              canvas.drawText(botChar, left + pw / 2f, bottom - ph * 0.25f, popupTextPaint);
                           } else {
                               float pw = colW * 1.16f;
                               float left = Math.max(dp(2), Math.min(w - pw - dp(2), cx - pw / 2f));
@@ -746,7 +807,7 @@ jobs:
                               canvas.drawRoundRect(rect, dp(4), dp(4), borderPaint);
 
                               popupTextPaint.setColor(Color.parseColor(THEMES[themeIndex][6]));
-                              popupTextPaint.setTextSize(rowH * 0.42f);
+                              popupTextPaint.setTextSize(rowH * 0.40f);
                               canvas.drawText(topChar, rect.centerX(), top + (bottom - top) * 0.48f, popupTextPaint);
 
                               botTextPaint.setTextSize(rowH * 0.22f);
@@ -770,11 +831,11 @@ jobs:
                       canvas.drawRect(rect, keyPaint);
                       canvas.drawRect(rect, borderPaint);
 
-                      topTextPaint.setTextSize(Math.min(dp(21), h * 0.36f));
+                      topTextPaint.setTextSize(Math.min(dp(20), h * 0.35f));
                       botTextPaint.setTextSize(Math.min(dp(12), h * 0.20f));
 
-                      canvas.drawText(top, x + w / 2f, y + h * 0.44f, topTextPaint);
-                      canvas.drawText(bot, x + w / 2f, y + h * 0.82f, botTextPaint);
+                      canvas.drawText(formatDisplayLabel(top), x + w / 2f, y + h * 0.45f, topTextPaint);
+                      canvas.drawText(formatDisplayLabel(bot), x + w / 2f, y + h * 0.83f, botTextPaint);
 
                       if (commaHint) {
                           botTextPaint.setTextSize(Math.min(dp(11), h * 0.18f));
@@ -805,7 +866,7 @@ jobs:
                           botTextPaint.setTextSize(dp(11));
                           canvas.drawText(currentMode == MODE_EN ? "EN (🌐)" : "ខ្មែរ (🌐)", spX + spW / 2f, y + rowH * 0.60f, botTextPaint);
                       }
-                      canvas.drawText("។", spX + spW - dp(16), y + rowH * 0.62f, topTextPaint);
+                      canvas.drawText("\u17D4", spX + spW - dp(16), y + rowH * 0.62f, topTextPaint);
 
                       float delX = unit * 7.4f;
                       drawFlatSpecialKey(canvas, delX, y, unit * 1.3f, rowH, "⌫", isHoldingBackspace);
@@ -1223,7 +1284,7 @@ jobs:
                                   isShifted = false;
                                   triggerModeTransition(nextLang, 1f);
                               } else {
-                                  ic.commitText(x < midSpace ? "?" : "។", 1);
+                                  ic.commitText(x < midSpace ? "?" : "\u17D4", 1);
                               }
                           } else {
                               ic.commitText(" ", 1);
